@@ -22,11 +22,6 @@ If you have Python installed:
 python3 -m http.server 8000
 ```
 
-**Python 2:**
-```bash
-python -m SimpleHTTPServer 8000
-```
-
 Then open your browser to: http://localhost:8000
 
 ### Option 2: Using Node.js http-server
