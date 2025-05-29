@@ -3,10 +3,52 @@ let bullets = [];
 let asteroids = [];
 let matrixStreams = [];
 let selectedHero = 0; // Selected hero index
-let gameState = 'intro'; // 'intro', 'playing', 'gameOver', 'paused', 'victory'
+let gameState = 'intro'; // 'intro', 'heroSelect', 'gameSelect', 'playing', 'gameOver', 'paused', 'victory'
+let currentGame = null; // Track which game is currently loaded
 let heroImages = []; // Store loaded hero images
 let heroNames = []; // Store hero names from filenames
 let heroFaceImages = []; // Store loaded hero face images
+
+// Available games in the ML ops workflow
+let games = [
+  {
+    id: 'data_cleaning',
+    title: 'Bad Data Matrix',
+    subtitle: 'Data Cleaning Phase',
+    description: 'Fight corrupted data in the matrix',
+    filename: 'data_cleaning.js'
+  },
+  {
+    id: 'feature_engineering',
+    title: 'Feature Forge',
+    subtitle: 'Feature Engineering Phase',
+    description: 'Build and shape data features',
+    filename: 'feature_engineering.js'
+  },
+  {
+    id: 'model_training',
+    title: 'Neural Network Training',
+    subtitle: 'Model Training & Evaluation',
+    description: 'Train and evaluate ML models',
+    filename: 'model_training.js'
+  },
+  {
+    id: 'model_deployment',
+    title: 'Deployment Pipeline',
+    subtitle: 'Model Deployment Phase',
+    description: 'Deploy models to production',
+    filename: 'model_deployment.js'
+  },
+  {
+    id: 'model_monitoring',
+    title: 'System Monitoring',
+    subtitle: 'Model Monitoring Phase',
+    description: 'Monitor model performance',
+    filename: 'model_monitoring.js'
+  }
+];
+
+let selectedGame = 0; // Currently selected game index
 let isPaused = false; // Track pause state
 let powerup = null; // Gemini powerup
 let hasPowerup = false; // Track if player has collected powerup
@@ -14,6 +56,11 @@ let powerupSpawned = false; // Track if powerup has been spawned
 let fireworks = []; // Victory fireworks
 let sqlParticles = []; // SQL text particles from destroyed asteroids
 let asteroidSpawnMultiplier = 1; // Increases after powerup collection
+
+// Game variables needed for data cleaning game
+let score = 0;
+let lives = 3;
+let gameOver = false;
 
 // --- MATRIX RAIN SETTINGS ---
 const SYMBOL_SIZE = 16;
@@ -33,10 +80,6 @@ const PLAYER_FRICTION = 0.99; // Closer to 1 means less friction
 const PLAYER_MAX_SPEED = 6;
 const PLAYER_INVINCIBILITY_DURATION = 120; // Frames (2 seconds at 60fps)
 
-let score = 0;
-let lives = 3;
-let gameOver = false;
-
 // --- PRELOAD ---
 function preload() {
   // Define the hero image files (you can add more here)
@@ -55,41 +98,68 @@ function preload() {
 
 // --- SETUP ---
 function setup() {
-  createCanvas(windowWidth, windowHeight);
-  colorMode(HSB, 360, 100, 100, 100); // Hue, Saturation, Brightness, Alpha
-  angleMode(RADIANS); // Use radians for all angle calculations
+  console.log("Setting up Data Heroes...");
 
-  // Prevent arrow keys from scrolling the page
-  window.addEventListener('keydown', function(e) {
-    // Arrow keys and space bar
-    if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
-      e.preventDefault();
+  try {
+    createCanvas(windowWidth, windowHeight);
+    colorMode(HSB, 360, 100, 100, 100); // Hue, Saturation, Brightness, Alpha
+    angleMode(RADIANS); // Use radians for all angle calculations
+
+    // Prevent arrow keys from scrolling the page
+    window.addEventListener('keydown', function(e) {
+      // Arrow keys and space bar
+      if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+        e.preventDefault();
+      }
+    }, false);
+
+    // Initialize Matrix Rain
+    console.log("Initializing matrix rain...");
+    let x = 0;
+    for (let i = 0; x < width + SYMBOL_SIZE; i++) {
+      let stream = new MatrixStream(x);
+      stream.generateSymbols();
+      matrixStreams.push(stream);
+      x += SYMBOL_SIZE * 0.9; // Spacing of streams
     }
-  }, false);
 
-  // Initialize Matrix Rain
-  let x = 0;
-  for (let i = 0; x < width + SYMBOL_SIZE; i++) {
-    let stream = new MatrixStream(x);
-    stream.generateSymbols();
-    matrixStreams.push(stream);
-    x += SYMBOL_SIZE * 0.9; // Spacing of streams
+    // Initialize player for data cleaning game
+    console.log("Initializing player...");
+    player = new Player();
+
+    console.log("Data Heroes setup complete!");
+    console.log("Game state:", gameState);
+    console.log("Available games:", games ? games.length : "undefined");
+  } catch (error) {
+    console.error("Error in setup:", error);
   }
-
-  player = new Player();
-  spawnAsteroids(ASTEROID_INIT_NUM, ASTEROID_INIT_SIZE);
 }
 
 // --- DRAW LOOP ---
 function draw() {
-  background(220, 10, 10, 35); // Dark blue-black background with some trail effect
+  try {
+    background(220, 10, 10, 35); // Dark blue-black background with some trail effect
 
-  for (let stream of matrixStreams) {
-    stream.render();
+    for (let stream of matrixStreams) {
+      stream.render();
+    }
+
+    if (gameState === 'intro') {
+      displayIntro();
+      return;
+    }
+  } catch (error) {
+    console.error("Error in draw loop:", error);
+    // Fallback display
+    background(0);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(24);
+    text("Error loading game. Check console for details.", width/2, height/2);
   }
 
-  if (gameState === 'intro') {
-    displayIntro();
+  if (gameState === 'heroSelect') {
+    displayHeroSelect();
     return;
   }
 
@@ -113,10 +183,27 @@ function draw() {
     return;
   }
 
-  player.handleInput();
-  player.update();
-  player.edges();
-  player.render();
+  // Route to appropriate game logic based on currentGame
+  if (currentGame === 'data_cleaning') {
+    // Data cleaning asteroids game
+    player.handleInput();
+    player.update();
+    player.edges();
+    player.render();
+  } else if (currentGame === 'feature_engineering') {
+    // Feature engineering game
+    if (typeof updateFeatureEngineering === 'function') {
+      updateFeatureEngineering();
+      renderFeatureEngineering();
+      return; // Feature engineering handles its own rendering
+    }
+  } else {
+    // Default to data cleaning for now
+    player.handleInput();
+    player.update();
+    player.edges();
+    player.render();
+  }
 
   if (player.isInvincible) {
     player.invincibilityTimer--;
@@ -288,13 +375,13 @@ function getFaceRotation(heroIndex) {
     // Animation cycle: 6.5 seconds total (0.5s animation + 2s offset + 4s pause)
     let cycleDuration = 6.5 * 60; // Convert to frames (assuming 60fps)
     let animationDuration = 0.5 * 60; // 0.5 seconds in frames
-    
+
     // Calculate offset: player 1 starts immediately, player 2 starts after 2 seconds
     let startOffset = heroIndex * 2 * 60; // 2 seconds offset between players
-    
+
     // Calculate position in animation cycle
     let time = (frameCount + startOffset) % cycleDuration;
-    
+
     if (time < animationDuration) {
         // During animation: swing counter-clockwise then clockwise
         let progress = time / animationDuration;
@@ -307,28 +394,140 @@ function getFaceRotation(heroIndex) {
     }
 }
 
+// Load the currently selected game
+function loadCurrentGame() {
+    currentGame = games[selectedGame].id;
+    console.log(`Loading game: ${currentGame} (${games[selectedGame].title})`);
+
+    if (currentGame === 'data_cleaning') {
+        // Initialize the asteroids game (already in this file for now)
+        resetGame();
+    } else if (currentGame === 'feature_engineering') {
+        // Initialize feature engineering game
+        try {
+            if (typeof initializeFeatureEngineering === 'function') {
+                initializeFeatureEngineering();
+                console.log("Feature Engineering initialized successfully");
+            } else {
+                console.log("Feature Engineering game not loaded yet");
+                gameState = 'intro';
+            }
+        } catch (error) {
+            console.error("Error initializing Feature Engineering:", error);
+            gameState = 'intro';
+        }
+    } else {
+        // Placeholder for other games
+        console.log(`${games[selectedGame].title} - Coming Soon!`);
+        gameState = 'intro'; // Return to menu for now
+        return;
+    }
+}
+
 function displayIntro() {
+    try {
+        // Title
+        fill(120, 100, 100);
+        textSize(96);
+        textAlign(CENTER, CENTER);
+        text("DATA HEROES", width / 2, height / 2 - 250);
+
+        textSize(24);
+        fill(120, 80, 90);
+        text("Machine Learning Operations Workflow", width / 2, height / 2 - 200);
+
+        // Main mission selection
+        textSize(32);
+        fill(120, 90, 100);
+        text("Select Your Mission:", width / 2, height / 2 - 140);
+
+        // Check if games array exists
+        if (!games || games.length === 0) {
+            textSize(18);
+            fill(255, 80, 80);
+            text("Error: Games not loaded", width / 2, height / 2);
+            return;
+        }
+
+        // Draw game options with wider spacing
+        let spacing = min(160, width / (games.length + 1));
+        let startX = width / 2 - (spacing * (games.length - 1) / 2);
+
+        for (let i = 0; i < games.length; i++) {
+            let gameX = startX + spacing * i;
+            let gameY = height / 2 - 50;
+
+            push();
+
+            // Highlight selected game
+            if (i === selectedGame) {
+                stroke(120, 100, 100);
+                strokeWeight(1);
+                noFill();
+                rect(gameX - 60, gameY - 45, 120, 120, 10);
+            }
+
+            // Game number box - same color for all
+            fill(120, 80, 90);
+            rectMode(CENTER);
+            rect(gameX, gameY, 60, 60, 10);
+
+            // Game number
+            fill(0, 0, 100);
+            textSize(32);
+            text(i + 1, gameX, gameY);
+
+            // Game title - consistent styling
+            textSize(14);
+            textStyle(NORMAL); // Explicitly set to normal weight
+            fill(120, 80, 90);
+            text(games[i].title, gameX, gameY + 50);
+
+            pop();
+        }
+
+        // Selected game description
+        textSize(18);
+        fill(120, 70, 80);
+        text(games[selectedGame].subtitle, width / 2, height / 2 + 80);
+        textSize(16);
+        fill(120, 60, 70);
+        text(games[selectedGame].description, width / 2, height / 2 + 110);
+
+        // Instructions
+        textSize(16);
+        fill(120, 60, 70);
+        text("Use ← → arrows to select • Press ENTER to choose heroes • Press SPACE to start", width / 2, height / 2 + 160);
+
+    } catch (error) {
+        console.error("Error in displayIntro:", error);
+        fill(255, 80, 80);
+        textAlign(CENTER, CENTER);
+        textSize(18);
+        text("Error displaying intro: " + error.message, width / 2, height / 2);
+    }
+}
+
+function displayHeroSelect() {
     // Title
     fill(120, 100, 100);
-    textSize(96);
+    textSize(64);
     textAlign(CENTER, CENTER);
-    text("DATA HEROES", width / 2, height / 2 - 250);
+    text("DATA HEROES", width / 2, height / 2 - 200);
 
-    textSize(24);
-    fill(120, 80, 90);
-    text("Fighting Bad Data in the Matrix", width / 2, height / 2 - 150);
-    text("Surfacing insights from chaos", width / 2, height / 2 - 125);
+    // Current mission info
+    textSize(28);
+    fill(120, 90, 100);
+    text(games[selectedGame].title, width / 2, height / 2 - 150);
 
-    // Story text
     textSize(18);
-    fill(120, 60, 80);
-    text("The data matrix has been corrupted with bad data!", width / 2, height / 2 - 80);
-    text("Only our data heroes can clean up this mess...", width / 2, height / 2 - 50);
+    fill(120, 70, 80);
+    text(games[selectedGame].description, width / 2, height / 2 - 120);
 
     // Hero selection
     textSize(24);
     fill(120, 90, 100);
-    text("Choose Your Data Hero:", width / 2, height / 2 );
+    text("Choose Your Data Hero:", width / 2, height / 2 - 70);
 
     // Calculate spacing for heroes
     let heroCount = heroImages.length;
@@ -339,14 +538,22 @@ function displayIntro() {
     for (let i = 0; i < heroCount; i++) {
         push();
         let heroX = startX + spacing * i;
-        let heroY = height / 2 + 100;
-        
+        let heroY = height / 2 + 30;
+
+        // Highlight selected hero
+        if (i === selectedHero) {
+            stroke(120, 100, 100);
+            strokeWeight(3);
+            noFill();
+            ellipse(heroX, heroY, 140, 140);
+        }
+
         // Apply face animation rotation
         translate(heroX, heroY);
         rotate(getFaceRotation(i));
-        
+
         imageMode(CENTER);
-        let faceScale = 0.8; // Smaller scale for face images
+        let faceScale = 0.8;
         image(heroFaceImages[i], 0, 0,
               heroFaceImages[i].width * faceScale, heroFaceImages[i].height * faceScale);
         pop();
@@ -354,14 +561,14 @@ function displayIntro() {
         // Hero name and key prompt
         textSize(20);
         fill(120, 80, 90);
-        text(heroNames[i], heroX, height / 2 + 200);
-        text(`Press [${i + 1}]`, heroX, height / 2 + 220);
+        text(heroNames[i], heroX, heroY + 100);
+        text(`Press [${i + 1}]`, heroX, heroY + 120);
     }
 
     // Instructions
     textSize(16);
     fill(120, 60, 70);
-    text("Arrow keys to move • Space to shoot • Clean the bad data!", width / 2, height / 2 + 250);
+    text("Select your hero and press ENTER to start the mission!", width / 2, height / 2 + 200);
 }
 
 function displayPauseMenu() {
@@ -390,14 +597,14 @@ function displayPauseMenu() {
     push();
     translate(width / 2, height / 2 - 50);
     rotate(getFaceRotation(selectedHero));
-    
+
     imageMode(CENTER);
     let faceScale = 0.6;
     image(heroFaceImages[selectedHero], 0, 0,
           heroFaceImages[selectedHero].width * faceScale,
           heroFaceImages[selectedHero].height * faceScale);
     pop();
-    
+
     textSize(16);
     fill(120, 80, 90);
     text(`Playing as: ${heroNames[selectedHero]}`, width / 2, height / 2);
@@ -475,7 +682,7 @@ function displayHeroSwap() {
         // Apply face animation rotation
         translate(heroX, heroY);
         rotate(getFaceRotation(i));
-        
+
         imageMode(CENTER);
         let faceScale = 0.6; // Smaller scale for hero swap
         image(heroFaceImages[i], 0, 0,
@@ -497,12 +704,31 @@ function displayHeroSwap() {
 
 function keyPressed() {
   if (gameState === 'intro') {
+    // Game selection navigation
+    if (keyCode === LEFT_ARROW) {
+      selectedGame = (selectedGame - 1 + games.length) % games.length;
+    } else if (keyCode === RIGHT_ARROW) {
+      selectedGame = (selectedGame + 1) % games.length;
+    } else if (keyCode === ENTER) {
+      gameState = 'heroSelect';
+    } else if (key === ' ') {
+      // Quick start with current selections
+      gameState = 'playing';
+      loadCurrentGame();
+    }
+    return;
+  }
+
+  if (gameState === 'heroSelect') {
     // Handle dynamic number of heroes (1-9 keys)
     let heroIndex = parseInt(key) - 1;
     if (!isNaN(heroIndex) && heroIndex >= 0 && heroIndex < heroImages.length) {
       selectedHero = heroIndex;
+    } else if (keyCode === ENTER) {
       gameState = 'playing';
-      resetGame();
+      loadCurrentGame();
+    } else if (keyCode === ESCAPE) {
+      gameState = 'intro';
     }
     return;
   }
@@ -536,19 +762,36 @@ function keyPressed() {
   }
 
   if (gameState === 'playing') {
+    // Universal pause for all games
     if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
       gameState = 'paused';
       return;
     }
+
+    // Route input to appropriate game
+    if (currentGame === 'feature_engineering') {
+      if (typeof handleFeatureEngineeringInput === 'function') {
+        handleFeatureEngineeringInput();
+      }
+      return;
+    } else if (currentGame === 'data_cleaning') {
+      // Handle data cleaning (asteroids) input
+      if (key === ' ') {
+        player.shoot();
+      }
+    }
   }
 
   if ((gameOver || gameState === 'victory') && (key === 'r' || key === 'R')) {
-      resetGame();
+      if (currentGame === 'data_cleaning') {
+        resetGame();
+      } else if (currentGame === 'feature_engineering') {
+        if (typeof resetGame === 'function') {
+          resetGame(); // Feature engineering's resetGame
+        }
+      }
       gameState = 'playing';
       return;
-  }
-  if (key === ' ') {
-    player.shoot();
   }
 }
 
