@@ -612,7 +612,7 @@ function displayPauseMenu() {
     // Menu options
     textSize(20);
     fill(120, 90, 100);
-    text("[C] Continue Playing", width / 2, height / 2 + 50);
+    text("[ENTER] Continue Playing", width / 2, height / 2 + 50);
     text("[H] Change Hero", width / 2, height / 2 + 80);
     text("[R] Restart Game", width / 2, height / 2 + 110);
     text("[M] Main Menu", width / 2, height / 2 + 140);
@@ -734,12 +734,19 @@ function keyPressed() {
   }
 
   if (gameState === 'paused') {
-    if (key === 'c' || key === 'C') {
+    if (keyCode === ENTER) {
       gameState = 'playing';
     } else if (key === 'h' || key === 'H') {
       gameState = 'heroSwap';
     } else if (key === 'r' || key === 'R') {
-      resetGame();
+      // Restart the appropriate game
+      if (currentGame === 'data_cleaning') {
+        resetGame();
+      } else if (currentGame === 'feature_engineering') {
+        if (typeof resetFeatureEngineering === 'function') {
+          resetFeatureEngineering();
+        }
+      }
       gameState = 'playing';
     } else if (key === 'm' || key === 'M') {
       gameState = 'intro';
@@ -794,6 +801,7 @@ function keyPressed() {
       return;
   }
 }
+
 
 function windowResized() {
   // Account for any browser UI elements

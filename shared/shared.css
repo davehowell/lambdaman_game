@@ -1,0 +1,211 @@
+/* Matrix Theme - Shared Styles for ML Ops Workflow Games */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    background-color: #000;
+    font-family: 'Courier New', monospace;
+    color: #00ff41;
+}
+
+/* Matrix Theme Colors */
+:root {
+    --matrix-green-bright: #00ff41;
+    --matrix-green-medium: #00cc33;
+    --matrix-green-dark: #008822;
+    --matrix-green-dim: #004411;
+    --matrix-black: #000000;
+    --matrix-dark-green: #001100;
+}
+
+/* Main container for all games */
+.game-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: linear-gradient(180deg, var(--matrix-black) 0%, var(--matrix-dark-green) 100%);
+}
+
+/* Matrix text styling */
+.matrix-text {
+    font-family: 'Courier New', monospace;
+    color: var(--matrix-green-bright);
+    text-shadow: 0 0 10px var(--matrix-green-bright);
+}
+
+.matrix-text-dim {
+    color: var(--matrix-green-dark);
+    text-shadow: 0 0 5px var(--matrix-green-dark);
+}
+
+/* Game UI Elements */
+.game-ui {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    color: var(--matrix-green-bright);
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 0 10px var(--matrix-green-bright);
+}
+
+.score-display {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.lives-display {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.level-display {
+    font-size: 16px;
+}
+
+/* Navigation Elements */
+.nav-button {
+    background: transparent;
+    border: 2px solid var(--matrix-green-bright);
+    color: var(--matrix-green-bright);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    padding: 10px 20px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    text-shadow: 0 0 10px var(--matrix-green-bright);
+    box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+}
+
+.nav-button:hover {
+    background: var(--matrix-green-bright);
+    color: var(--matrix-black);
+    text-shadow: none;
+    box-shadow: 0 0 30px rgba(0, 255, 65, 0.6);
+}
+
+/* Game completion overlay */
+.game-complete-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    color: var(--matrix-green-bright);
+    text-align: center;
+}
+
+.game-complete-title {
+    font-size: 48px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 20px var(--matrix-green-bright);
+    animation: matrix-glow 2s ease-in-out infinite alternate;
+}
+
+.game-complete-message {
+    font-size: 24px;
+    margin-bottom: 30px;
+    max-width: 600px;
+    line-height: 1.4;
+}
+
+.game-complete-score {
+    font-size: 32px;
+    margin-bottom: 40px;
+    color: var(--matrix-green-medium);
+}
+
+/* Matrix glow animation */
+@keyframes matrix-glow {
+    from {
+        text-shadow: 0 0 20px var(--matrix-green-bright);
+    }
+    to {
+        text-shadow: 0 0 30px var(--matrix-green-bright), 0 0 40px var(--matrix-green-medium);
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .game-ui {
+        font-size: 14px;
+    }
+    
+    .game-complete-title {
+        font-size: 36px;
+    }
+    
+    .game-complete-message {
+        font-size: 18px;
+    }
+    
+    .game-complete-score {
+        font-size: 24px;
+    }
+}
+
+/* Hide scrollbars but allow scrolling */
+::-webkit-scrollbar {
+    display: none;
+}
+
+html {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Canvas styling */
+canvas {
+    display: block;
+    margin: 0 auto;
+}
+
+/* Loading screen */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--matrix-black);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    color: var(--matrix-green-bright);
+    font-size: 24px;
+    text-shadow: 0 0 20px var(--matrix-green-bright);
+}
+
+/* Pulse animation for loading */
+.loading-text {
+    animation: matrix-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes matrix-pulse {
+    0%, 100% {
+        opacity: 0.5;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}

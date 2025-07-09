@@ -3,56 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lambda man and Captain Jupyter present:</title>
+    <title>Data Heroes: ML Operations Workflow</title>
+    <link rel="stylesheet" href="shared/shared.css">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Prevent scrollbars */
-            width: 100vw;
-            height: 100vh;
-            background-color: #222;
-            font-family: Arial, sans-serif;
-        }
-        main {
-            width: 100%;
-            height: 100%;
+        .workflow-container {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            text-align: center;
-        }
-        h1 {
-            color: #fff;
-            margin: 10px 0;
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
             z-index: 10;
         }
-        #game-container {
+
+        .main-title {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: var(--matrix-green-bright);
+            text-shadow: 0 0 20px var(--matrix-green-bright);
+            animation: matrix-glow 3s ease-in-out infinite alternate;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            margin-bottom: 40px;
+            text-align: center;
+            color: var(--matrix-green-medium);
+            max-width: 800px;
+            line-height: 1.4;
+        }
+
+        .workflow-pipeline {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            width: 100%;
+            margin-bottom: 40px;
+        }
+
+        .workflow-phase {
+            background: rgba(0, 255, 65, 0.1);
+            border: 2px solid var(--matrix-green-dark);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
             position: relative;
+            overflow: hidden;
+        }
+
+        .workflow-phase:hover {
+            border-color: var(--matrix-green-bright);
+            background: rgba(0, 255, 65, 0.2);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 255, 65, 0.3);
+        }
+
+        .workflow-phase.completed {
+            border-color: var(--matrix-green-bright);
+            background: rgba(0, 255, 65, 0.15);
+        }
+
+        .workflow-phase.completed::after {
+            content: "✓";
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            color: var(--matrix-green-bright);
+        }
+
+        .phase-title {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: var(--matrix-green-bright);
+        }
+
+        .phase-subtitle {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: var(--matrix-green-medium);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .phase-description {
+            font-size: 14px;
+            color: var(--matrix-green-dark);
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+
+        .phase-score {
+            font-size: 18px;
+            color: var(--matrix-green-medium);
+            margin-top: 15px;
+        }
+
+        .team-info {
+            text-align: center;
+            margin-top: 40px;
+            color: var(--matrix-green-medium);
+        }
+
+        .hero-gallery {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .hero-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid var(--matrix-green-dark);
+            object-fit: cover;
+            transition: all 0.3s ease;
+        }
+
+        .hero-avatar:hover {
+            border-color: var(--matrix-green-bright);
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+        }
+
+        #matrix-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 36px;
+            }
+
+            .subtitle {
+                font-size: 18px;
+            }
+
+            .workflow-pipeline {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .workflow-phase {
+                padding: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <main>
-        <h1>Data Heroes: ML Operations Workflow</h1>
-        <div id="game-container"></div>
-    </main>
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="workflow-container">
+        <h1 class="main-title">DATA HEROES</h1>
+        <p class="subtitle">ML Operations Workflow - Fight chaos, bring order to data, surface insights from the matrix</p>
+
+        <div class="workflow-pipeline" id="workflow-pipeline">
+            <!-- Workflow phases will be populated by JavaScript -->
+        </div>
+
+        <div class="team-info">
+            <h3>Your Data Heroes Team</h3>
+            <div class="hero-gallery" id="hero-gallery">
+                <!-- Hero avatars will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Game iframe container (hidden by default) -->
+    <iframe id="game-frame" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: none; z-index: 1000;"></iframe>
 
     <!-- p5.js library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
-
-    <!-- Individual game modules -->
-    <script src="feature_engineering.js"></script>
-    <script src="model_training.js"></script>
-    <script src="model_deployment.js"></script>
-    <script src="model_monitoring.js"></script>
-
-    <!-- Main game system -->
-    <script src="sketch.js"></script>
+    
+    <!-- Hub matrix rain sketch -->
+    <script src="hub-sketch.js"></script>
+    
+    <!-- Shared utilities and hub navigation -->
+    <script src="shared/shared.js"></script>
+    <script src="hub.js"></script>
 </body>
 </html>
