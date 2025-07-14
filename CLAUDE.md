@@ -1,131 +1,172 @@
 # Data Heroes Game (Lambda Man Project)
 
 ## Overview
-A Matrix-themed Asteroids game with a data team twist. Features team members as playable "Data Heroes" fighting bad data in a corrupted matrix. Built with p5.js for a presentation to showcase the data team's mission.
+A Matrix-themed ML Operations workflow presentation system featuring 5 retro arcade games, each representing a phase of the ML pipeline. Built with p5.js for engaging data team presentations.
 
 ## Project Purpose
-Created for a data team presentation to illustrate the team's role in "bringing order to chaos" and "surfacing insights from data". The game serves as an engaging metaphor for data quality and cleanup work.
+Created for a data team presentation to illustrate the team's role in the ML operations workflow through interactive game metaphors. Each game represents a critical phase: Data Cleaning, Feature Engineering, Model Training, Model Deployment, and Model Monitoring.
 
-## Key Features
+## Current Progress (2025-07-09)
+- **✅ Data Cleaning (Asteroids)** - COMPLETE
+- **✅ Feature Engineering (Tetris)** - COMPLETE  
+- **🎯 Model Monitoring (Missile Command)** - NEXT PRIORITY
+- **⏳ Model Deployment (Pac-Man)** - TODO
+- **⏳ Model Training (Space Invaders)** - TODO
 
-### Core Gameplay
-- **Asteroids-style mechanics** with Matrix rain background
-- **Bad data asteroids** containing corrupted data symbols (`{}`, `()`, `=>`, `if`, etc.)
-- **SQL command bullets** (SELECT, DELETE, UPDATE, CLEAN, etc.)
-- **Dynamic hero system** using actual team member images
-- **Pause menu** with hero swapping mid-game
-- **Gemini-inspired powerup** at 500 points
-- **Database Cleaner ultimate weapon** - expanding wireframe cylinder that clears all bad data
-- **Victory condition** with fireworks when all data is cleaned
+## Project Architecture
 
-### Visual Features
-- **Matrix rain effect** with Japanese characters and alphanumerics
-- **Pixelated team member sprites** loaded from PNG files
-- **Data stream trail** when heroes boost
-- **Wireframe 3D database cylinder** for ultimate weapon
-- **Rainbow-colored Gemini powerup** with concave diamond shape
-- **Particle effects** when asteroids are destroyed
-
-## Technical Architecture
-
-### Files
+### File Structure
 ```
 lambdaman_game/
-├── index.html       # Main HTML with overflow prevention
-├── sketch.js        # All game logic (1000+ lines)
-├── images/          # Team member sprites
-│   ├── Dave.png
-│   └── Nadya.png
-└── CLAUDE.md        # This file
+├── index.html                    # Main hub with interactive ML workflow
+├── hub-sketch.js                 # Hub matrix rain background
+├── hub.js                        # Hub navigation logic
+├── presentation.md               # Game metaphor explanations
+├── next-steps.md                 # Detailed implementation plan
+├── CLAUDE.md                     # This file
+├── shared/
+│   ├── shared.css               # Matrix theme styles
+│   ├── shared.js                # Utilities, sprites, navigation
+│   └── sprites/                 # Hero images
+│       ├── Dave.png
+│       ├── Dave_face.png
+│       ├── Nadya.png
+│       ├── Nadya_face.png
+│       └── [additional team members]
+├── games/
+│   ├── data-cleaning.html       # ✅ COMPLETE - Asteroids
+│   ├── data-cleaning-classes.js # ✅ COMPLETE
+│   ├── feature-engineering.html # ✅ COMPLETE - Tetris
+│   ├── feature-engineering-classes.js # ✅ COMPLETE
+│   ├── model-monitoring.html    # 🎯 NEXT - Missile Command
+│   ├── model-deployment.html    # TODO - Pac-Man
+│   └── model-training.html      # TODO - Space Invaders
+└── to_be_integrated/           # Source files to port
+    ├── missle_command_example.js # → model-monitoring.html
+    ├── model_deploy_pacman.html  # → model-deployment.html
+    └── mt_me_space_invaders.html # → model-training.html
 ```
 
-### Key Classes
-- **Player** - Hero ship with image rendering and data abilities
-- **Bullet** - SQL command projectiles
-- **DatabaseCleaner** - Special expanding weapon (extends Bullet)
-- **Asteroid** - Bad data entities with random data symbols
-- **Powerup** - Gemini-style concave diamond
-- **MatrixStream/MatrixSymbol** - Background rain effect
-- **Firework** - Victory celebration particles
+## Proven Template Architecture
 
-### Game States
-- `intro` - Hero selection screen
+### Key Success Patterns (Established)
+- **Modular HTML files** with embedded p5.js for each game
+- **Shared assets** from `../shared/sprites/` and `../shared/shared.js`
+- **Consistent hero system** with face images and rotation animations
+- **Standardized pause menu** with hero switching (H key)
+- **Matrix theme integration** throughout all games
+- **Hub navigation** with simple `returnToHub()` function
+- **Performance optimizations** maintaining 60fps
+
+### Standard Game States
 - `playing` - Main gameplay
-- `paused` - Pause menu
-- `heroSwap` - Hero change screen (preserves game state)
-- `gameOver` - Death screen
-- `victory` - Win screen with fireworks
+- `paused` - Pause menu with options
+- `heroSwap` - Hero selection (preserves progress)
+- `gameOver` - Failure screen
+- `victory` - Success screen with fireworks
 
-## Controls
-- **Number keys (1-9)** - Select hero
-- **Arrow keys** - Move
-- **Space** - Shoot / Use Database Cleaner
-- **P or ESC** - Pause
+### Controls (Consistent Across All Games)
+- **Arrow keys** - Movement/control
+- **Space** - Primary action
+- **P/ESC** - Pause
 - **R** - Restart (from game over/victory)
 - **In Pause Menu:**
-  - C - Continue
+  - ENTER - Continue
   - H - Change Hero
   - R - Restart
-  - M - Main Menu
+  - M - Main Menu (returns to hub)
 
-## Customization Points
+## Completed Games
 
-### Adding Team Members
-1. Add PNG files to `images/` folder
-2. Update `heroFiles` array in `preload()` function (line 39)
-3. Names are automatically extracted from filenames
+### 1. Data Cleaning (Asteroids-style)
+- **Theme:** Fight corrupted data in the matrix using SQL commands
+- **Features:** Database Cleaner powerup, bad data asteroids, SQL bullets
+- **Victory:** Clear all data with Database Cleaner
 
-### Game Balance
-- `ASTEROID_INIT_NUM` - Starting asteroid count
-- `PLAYER_SIZE` - Hero sprite size
-- `asteroidSpawnMultiplier` - Increases after powerup collection
-- Powerup appears at 500 points (line 158)
+### 2. Feature Engineering (Tetris-style)
+- **Theme:** Build and shape data features like Tetris blocks
+- **Features:** Data engineering terms on pieces (NORMALIZE, ONE-HOT, etc.)
+- **Special:** Tractor beam visual effects when manipulating pieces
+- **Victory:** Clear 30 lines
 
-### Visual Tweaks
-- Matrix rain colors use HSB color mode
-- Asteroid `dataBits` array contains bad data symbols
-- Database weapon expansion rate and duration
+## Next Priority: Model Monitoring (Missile Command)
 
-## Important Implementation Details
+### Implementation Plan
+1. Use proven template from data-cleaning.html
+2. Port missile command logic from `missle_command_example.js`
+3. Theme adaptation:
+   - Cities → ML Models to protect
+   - Missiles → Data drift, anomalies, performance degradation
+   - Defense missiles → Monitoring alerts and corrections
+4. Maintain hero system and pause menu
+5. Add special "System Reset" powerup (like Database Cleaner)
 
-### Dynamic Hero Loading
-```javascript
-const heroFiles = ['Dave.png', 'Nadya.png']; // Add more here
-```
+### Expected Features
+- Protect ML models from incoming threats
+- Different threat types (drift, anomalies, errors)
+- Hero operates defense turret with tractor beam
+- Progressive difficulty as threats increase
+- Victory condition when surviving all waves
 
-### Collision Detection
-- Player uses 75% of asteroid radius for more forgiving gameplay
-- Database Cleaner uses full radius + buffer for complete destruction
-- Powerup collision uses standard radius check
+## Technical Guidelines
 
-### Victory Condition
-Triggered when Database Cleaner destroys all asteroids and has expanded significantly. This ensures dramatic presentation timing.
+### When Adding New Games
+1. **Always start with data-cleaning.html as template**
+2. Create corresponding `-classes.js` file for game logic
+3. Ensure these classes are present:
+   - `MatrixStream` and `MatrixSymbol` for background
+   - `Firework` for victory celebrations
+   - Game-specific classes as needed
+4. Maintain consistent UI structure:
+   - Score display
+   - Level/Lives display  
+   - Phase indicator
+   - Hero name display
+5. Test pause menu and hero switching
+6. Verify hub navigation works
 
-### Performance Considerations
-- Arrow key scrolling prevented with event listener
-- Canvas resizes to window dimensions
-- Matrix streams regenerate on window resize
-- Particle effects cleaned up when off-screen
+### Performance Standards
+- Target 60fps consistently
+- Cap particle effects and spawning rates
+- Clean up off-screen objects
+- Use `frameCount % n` for periodic updates
 
-## Known Features & Behaviors
-- Database Cleaner is one-time use only
-- Asteroid spawn rate triples after powerup collection
-- Hero can be changed mid-game without losing progress
-- Victory only possible with Database Cleaner powerup
-- All asteroid fragments are destroyed by Database Cleaner
+### Hero System
+- Heroes loaded from `shared/sprites/`
+- Face images for pause menu (`*_face.png`)
+- Animation cycle: 6.5s with 0.5s wiggle
+- Support for unlimited team members
 
-## Presentation Tips
-1. Start by showing the corrupted data matrix
-2. Introduce team members via hero selection
-3. Demonstrate normal gameplay (cleaning small data issues)
-4. Show powerup collection and increased chaos
-5. Climax with Database Cleaner clearing all bad data
-6. Victory screen reinforces the team's mission
+## Important Notes
 
-## Future Enhancement Ideas
-- More team member sprites
-- Different powerup types
-- Boss asteroid with nested bad data
-- Multiplayer co-op mode
-- Data quality metrics display
-- Integration with real data quality scores
+### For Next Session
+1. **Current Task:** Port Model Monitoring (Missile Command)
+2. **Source File:** `to_be_integrated/missle_command_example.js`
+3. **Template:** Use `games/data-cleaning.html` structure
+4. **Priority:** This is game 3 of 5 in the workflow
+
+### Key Decisions Made
+- Tetris pieces show data engineering terms (NORMALIZE, ONE-HOT, etc.)
+- Heroes have tractor beam effects in Feature Engineering
+- Victory conditions are game-appropriate (30 lines for Tetris)
+- All games maintain Matrix green theme consistency
+- Simple navigation back to hub (no complex completion overlays)
+
+### Testing Checklist
+- [ ] Game loads and initializes properly
+- [ ] Hero system works (switching mid-game)
+- [ ] Pause menu functions correctly
+- [ ] Game mechanics feel smooth at 60fps
+- [ ] Victory/Game Over screens display
+- [ ] Navigation back to hub works
+- [ ] Matrix rain renders in background
+
+## Presentation Flow
+1. **Hub:** Interactive ML pipeline overview
+2. **Data Cleaning:** Clear corrupted data (Asteroids)
+3. **Feature Engineering:** Build features (Tetris)
+4. **Model Training:** Train networks (Space Invaders) - TODO
+5. **Model Deployment:** Navigate deployment (Pac-Man) - TODO
+6. **Model Monitoring:** Defend models (Missile Command) - NEXT
+
+The project demonstrates the data team's complete ML operations workflow through engaging, retro-themed games that reinforce each phase's importance.
