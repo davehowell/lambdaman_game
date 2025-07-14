@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitoring - Model Monitoring Phase</title>
+    <link rel="stylesheet" href="../shared/shared.css">
+    <style>
+        .monitoring-hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px var(--matrix-green-bright);
+        }
+
+        .system-status {
+            display: flex;
+            gap: 30px;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 12px;
+            color: var(--matrix-green-medium);
+        }
+
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .base-status {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .base-indicator {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--matrix-green-bright);
+            background: var(--matrix-green-bright);
+            border-radius: 3px;
+        }
+
+        .base-indicator.destroyed {
+            background: transparent;
+            border-color: var(--matrix-green-dark);
+        }
+
+        .controls-help {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: var(--matrix-green-dark);
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .crosshair {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--matrix-green-bright);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 200;
+            transform: translate(-50%, -50%);
+            opacity: 0.8;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: var(--matrix-green-bright);
+        }
+
+        .crosshair::before {
+            width: 2px;
+            height: 10px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .crosshair::after {
+            width: 10px;
+            height: 2px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="monitoring-hud">
+            <div class="system-status">
+                <div class="status-item">
+                    <div class="status-label">SCORE</div>
+                    <div class="status-value" id="score">00000000</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">WAVE</div>
+                    <div class="status-value" id="wave">1</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">PHASE</div>
+                    <div class="status-value">MONITORING</div>
+                </div>
+            </div>
+
+            <div class="base-status">
+                <div class="status-label">SYSTEMS:</div>
+                <div class="base-indicator" id="base-0"></div>
+                <div class="base-indicator" id="base-1"></div>
+                <div class="base-indicator" id="base-2"></div>
+            </div>
+        </div>
+
+        <div class="controls-help">
+            <div>MOUSE: Aim • CLICK: Launch Defense Missile</div>
+            <div>P/ESC: Pause • Defend ML systems from anomalies!</div>
+        </div>
+
+        <div class="crosshair" id="crosshair"></div>
+    </div>
+
+    <!-- p5.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+
+    <!-- Shared utilities -->
+    <script src="../shared/shared.js"></script>
+
+    <!-- Game script -->
+    <script>
+        // Model Monitoring Game - Missile Command Style
+        // Defend ML systems from anomaly missiles and model drift
+
+        // Game state
+        let gameState = 'playing'; // 'playing', 'paused', 'gameOver', 'victory', 'waveCleared'
+        let score = 0;
+        let wave = 1;
+        let gameOver = false;
+        let gameStartTime;
+
+        // Game objects
+        let bases = [];
+        let enemies = [];
+        let missiles = [];
+        let explosions = [];
+        let matrixStreams = [];
+
+        // Game constants
+        const NUM_BASES = 3;
+        const BASE_WIDTH = 80;
+        const BASE_HEIGHT = 30;
+        const MISSILE_SPEED = 8;
+        const EXPLOSION_RADIUS_MAX = 80;
+        const EXPLOSION_DURATION = 40;
+
+        // Enemy definitions (ML monitoring threats)
+        const ENEMY_DEFINITIONS = [
+            { name: "Data Drift", speed: 0.8, points: 10, color: [60, 180, 255], size: 25 },
+            { name: "Model Decay", speed: 1.0, points: 15, color: [100, 150, 250], size: 28 },
+            { name: "Anomaly Spike", speed: 1.2, points: 20, color: [255, 200, 80], size: 22 },
+            { name: "Performance Drop", speed: 0.6, points: 25, color: [230, 80, 80], size: 35 }
+        ];
+
+        const BOSS_DEFINITION = {
+            name: "System Failure",
+            speed: 0.4,
+            points: 200,
+            color: [255, 50, 50],
+            size: 80,
+            health: 8
+        };
+
+        // Wave management
+        let enemySpawnTimer = 0;
+        let enemySpawnInterval = 2000;
+        let enemiesThisWave = 5;
+        let enemiesSpawnedThisWave = 0;
+        let isBossActive = false;
+        let bossDefeatedThisGame = false;
+
+        function setup() {
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.parent(document.querySelector('.game-container'));
+
+            colorMode(HSB, 360, 100, 100, 100);
+
+            // Initialize matrix background (original implementation)
+            const matrixRain = MLOpsUtils.createMatrixRain(16, 10, 30);
+            matrixStreams = matrixRain.streams;
+
+            // Initialize bases (ML systems to defend)
+            initializeBases();
+
+            gameStartTime = millis();
+
+            console.log('Model Monitoring game initialized');
+        }
+
+        function draw() {
+            background(220, 10, 10, 35); // Original background
+
+            // Render matrix background
+            for (let stream of matrixStreams) {
+                stream.render();
+            }
+
+            if (gameState === 'playing') {
+                updateGame();
+            } else if (gameState === 'paused') {
+                displayPauseMenu();
+            } else if (gameState === 'gameOver') {
+                displayGameOver();
+            } else if (gameState === 'victory') {
+                displayVictory();
+            } else if (gameState === 'waveCleared') {
+                displayWaveCleared();
+            }
+
+            updateUI();
+            updateCrosshair();
+        }
+
+        function initializeBases() {
+            bases = [];
+            const baseSpacing = width / (NUM_BASES + 1);
+
+            for (let i = 0; i < NUM_BASES; i++) {
+                const x = baseSpacing * (i + 1);
+                const y = height - 60;
+                bases.push(new Base(x, y, i));
+            }
+        }
+
+        function updateGame() {
+            if (gameOver) return;
+
+            // Spawn enemies
+            if (millis() - enemySpawnTimer > enemySpawnInterval && enemiesSpawnedThisWave < enemiesThisWave) {
+                spawnEnemy();
+                enemySpawnTimer = millis();
+                enemiesSpawnedThisWave++;
+            }
+
+            // Update enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                enemies[i].update();
+                enemies[i].render();
+
+                // Check if enemy reached a base
+                if (enemies[i].hasReachedTarget()) {
+                    // Destroy the base
+                    const targetBase = enemies[i].targetBase;
+                    if (targetBase && !targetBase.isDestroyed) {
+                        targetBase.destroy();
+                        explosions.push(new Explosion(targetBase.x, targetBase.y, EXPLOSION_RADIUS_MAX));
+                    }
+                    enemies.splice(i, 1);
+                    continue;
+                }
+
+                // Remove if off screen
+                if (enemies[i].y > height + 50) {
+                    enemies.splice(i, 1);
+                }
+            }
+
+            // Update missiles
+            for (let i = missiles.length - 1; i >= 0; i--) {
+                missiles[i].update();
+                missiles[i].render();
+
+                if (missiles[i].hasReachedTarget()) {
+                    explosions.push(new Explosion(missiles[i].targetX, missiles[i].targetY, EXPLOSION_RADIUS_MAX));
+                    missiles.splice(i, 1);
+                } else if (missiles[i].isOffScreen()) {
+                    missiles.splice(i, 1);
+                }
+            }
+
+            // Update explosions
+            for (let i = explosions.length - 1; i >= 0; i--) {
+                explosions[i].update();
+                explosions[i].render();
+
+                // Check explosion-enemy collisions
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    if (explosions[i].hits(enemies[j])) {
+                        score += enemies[j].points;
+                        enemies.splice(j, 1);
+                    }
+                }
+
+                if (explosions[i].isDead()) {
+                    explosions.splice(i, 1);
+                }
+            }
+
+            // Render bases
+            for (let base of bases) {
+                base.render();
+            }
+
+            // Check wave completion
+            if (enemiesSpawnedThisWave >= enemiesThisWave && enemies.length === 0) {
+                if (wave >= 5 && !bossDefeatedThisGame) {
+                    // Victory condition
+                    gameState = 'victory';
+                } else {
+                    gameState = 'waveCleared';
+                }
+            }
+
+            // Check game over
+            if (bases.every(base => base.isDestroyed)) {
+                gameOver = true;
+                gameState = 'gameOver';
+            }
+        }
+
+        function spawnEnemy() {
+            const enemyType = ENEMY_DEFINITIONS[Math.floor(Math.random() * ENEMY_DEFINITIONS.length)];
+            const startX = Math.random() * width;
+            const targetBase = bases[Math.floor(Math.random() * bases.length)];
+
+            enemies.push(new Enemy(startX, -50, targetBase, enemyType));
+        }
+
+        function updateCrosshair() {
+            const crosshair = document.getElementById('crosshair');
+            crosshair.style.left = mouseX + 'px';
+            crosshair.style.top = mouseY + 'px';
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = MLOpsUtils.formatScore(score);
+            document.getElementById('wave').textContent = wave;
+
+            // Update base indicators
+            for (let i = 0; i < bases.length; i++) {
+                const indicator = document.getElementById(`base-${i}`);
+                if (bases[i].isDestroyed) {
+                    indicator.classList.add('destroyed');
+                } else {
+                    indicator.classList.remove('destroyed');
+                }
+            }
+        }
+
+        function displayPauseMenu() {
+            fill(0, 0, 0, 80);
+            rect(0, 0, width, height);
+
+            MLOpsUtils.drawGlowText(drawingContext, 'MONITORING PAUSED', width/2, height/2 - 60, 48);
+            MLOpsUtils.drawGlowText(drawingContext, 'Press P to continue', width/2, height/2, 24);
+            MLOpsUtils.drawGlowText(drawingContext, 'Press ESC to return to hub', width/2, height/2 + 40, 18);
+        }
+
+        function displayGameOver() {
+            fill(0, 0, 0, 80);
+            rect(0, 0, width, height);
+
+            MLOpsUtils.drawGlowText(drawingContext, 'SYSTEM FAILURE', width/2, height/2 - 60, 48);
+            MLOpsUtils.drawGlowText(drawingContext, 'ALL ML SYSTEMS COMPROMISED', width/2, height/2 - 20, 24);
+            MLOpsUtils.drawGlowText(drawingContext, `Final Score: ${MLOpsUtils.formatScore(score)}`, width/2, height/2 + 40, 24);
+            MLOpsUtils.drawGlowText(drawingContext, 'Press R to retry or ESC to return to hub', width/2, height/2 + 80, 18);
+        }
+
+        function displayVictory() {
+            fill(0, 0, 0, 60);
+            rect(0, 0, width, height);
+
+            MLOpsUtils.drawGlowText(drawingContext, 'SYSTEMS SECURED!', width/2, height/2 - 60, 48);
+            MLOpsUtils.drawGlowText(drawingContext, 'MONITORING COMPLETE', width/2, height/2 - 20, 36);
+            MLOpsUtils.drawGlowText(drawingContext, `Score: ${MLOpsUtils.formatScore(score)}`, width/2, height/2 + 40, 24);
+            MLOpsUtils.drawGlowText(drawingContext, 'Press SPACE to complete workflow', width/2, height/2 + 80, 18);
+        }
+
+        function displayWaveCleared() {
+            fill(0, 0, 0, 60);
+            rect(0, 0, width, height);
+
+            MLOpsUtils.drawGlowText(drawingContext, `WAVE ${wave} CLEARED`, width/2, height/2 - 40, 48);
+            MLOpsUtils.drawGlowText(drawingContext, 'Systems holding steady...', width/2, height/2 + 20, 24);
+            MLOpsUtils.drawGlowText(drawingContext, 'Press SPACE for next wave', width/2, height/2 + 60, 18);
+        }
+
+        function mousePressed() {
+            if (gameState === 'playing') {
+                // Launch defensive missile
+                const nearestBase = findNearestBase(mouseX, mouseY);
+                if (nearestBase && !nearestBase.isDestroyed) {
+                    missiles.push(new Missile(nearestBase.x, nearestBase.y, mouseX, mouseY));
+                }
+            }
+        }
+
+        function findNearestBase(x, y) {
+            let nearest = null;
+            let minDist = Infinity;
+
+            for (let base of bases) {
+                if (!base.isDestroyed) {
+                    const d = dist(x, y, base.x, base.y);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = base;
+                    }
+                }
+            }
+
+            return nearest;
+        }
+
+        function keyPressed() {
+            if (gameState === 'playing') {
+                if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
+                    gameState = 'paused';
+                }
+            } else if (gameState === 'paused') {
+                if (key === 'p' || key === 'P') {
+                    gameState = 'playing';
+                } else if (keyCode === ESCAPE) {
+                    returnToHub();
+                }
+            } else if (gameState === 'gameOver') {
+                if (key === 'r' || key === 'R') {
+                    resetGame();
+                } else if (keyCode === ESCAPE) {
+                    returnToHub();
+                }
+            } else if (gameState === 'victory') {
+                if (key === ' ' || keyCode === ENTER) {
+                    completeGame();
+                }
+            } else if (gameState === 'waveCleared') {
+                if (key === ' ' || keyCode === ENTER) {
+                    nextWave();
+                }
+            }
+        }
+
+        function nextWave() {
+            wave++;
+            enemiesThisWave = Math.min(5 + wave * 2, 15);
+            enemiesSpawnedThisWave = 0;
+            enemySpawnInterval = Math.max(1000, 2000 - wave * 100);
+            gameState = 'playing';
+        }
+
+        function resetGame() {
+            score = 0;
+            wave = 1;
+            gameOver = false;
+            gameState = 'playing';
+            enemies = [];
+            missiles = [];
+            explosions = [];
+            enemiesThisWave = 5;
+            enemiesSpawnedThisWave = 0;
+            enemySpawnInterval = 2000;
+            isBossActive = false;
+            bossDefeatedThisGame = false;
+
+            initializeBases();
+        }
+
+        function completeGame() {
+            const gameData = {
+                game: 'model-monitoring',
+                score: score,
+                completed: true,
+                timeSpent: millis() - gameStartTime,
+                message: 'ML systems successfully defended! All anomalies neutralized.'
+            };
+
+            MLOpsNavigation.returnToHub(gameData);
+        }
+
+        function returnToHub() {
+            const gameData = {
+                game: 'model-monitoring',
+                score: score,
+                completed: gameState === 'victory',
+                timeSpent: millis() - gameStartTime
+            };
+
+            MLOpsNavigation.returnToHub(gameData);
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+
+            // Regenerate matrix streams for new size
+            const matrixRain = MLOpsUtils.createMatrixRain(16, 10, 30);
+            matrixStreams = matrixRain.streams;
+
+            initializeBases();
+        }
+
+        // Game classes
+        class Base {
+            constructor(x, y, id) {
+                this.x = x;
+                this.y = y;
+                this.id = id;
+                this.width = BASE_WIDTH;
+                this.height = BASE_HEIGHT;
+                this.isDestroyed = false;
+            }
+
+            render() {
+                if (!this.isDestroyed) {
+                    push();
+                    fill(120, 80, 90);
+                    stroke(120, 100, 100);
+                    strokeWeight(2);
+                    rectMode(CENTER);
+                    rect(this.x, this.y, this.width, this.height);
+
+                    // Draw system label
+                    fill(120, 100, 100);
+                    noStroke();
+                    textAlign(CENTER, CENTER);
+                    textSize(12);
+                    text(`SYS-${this.id + 1}`, this.x, this.y);
+                    pop();
+                }
+            }
+
+            destroy() {
+                this.isDestroyed = true;
+            }
+        }
+
+        class Enemy {
+            constructor(x, y, targetBase, enemyType) {
+                this.x = x;
+                this.y = y;
+                this.targetBase = targetBase;
+                this.name = enemyType.name;
+                this.speed = enemyType.speed;
+                this.points = enemyType.points;
+                this.color = enemyType.color;
+                this.size = enemyType.size;
+                this.health = enemyType.health || 1;
+
+                // Calculate trajectory to target
+                if (targetBase) {
+                    const dx = targetBase.x - this.x;
+                    const dy = targetBase.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    this.vx = (dx / distance) * this.speed;
+                    this.vy = (dy / distance) * this.speed;
+                } else {
+                    this.vx = 0;
+                    this.vy = this.speed;
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            render() {
+                push();
+
+                // Draw enemy as a glowing threat
+                fill(0, 100, 100, 80);
+                stroke(0, 100, 100);
+                strokeWeight(2);
+                ellipse(this.x, this.y, this.size);
+
+                // Draw threat name
+                fill(0, 100, 100);
+                noStroke();
+                textAlign(CENTER, CENTER);
+                textSize(10);
+                text(this.name, this.x, this.y - this.size/2 - 15);
+
+                // Draw trajectory line
+                if (this.targetBase && !this.targetBase.isDestroyed) {
+                    stroke(0, 100, 100, 30);
+                    strokeWeight(1);
+                    line(this.x, this.y, this.targetBase.x, this.targetBase.y);
+                }
+
+                pop();
+            }
+
+            hasReachedTarget() {
+                if (!this.targetBase) return false;
+                const distance = dist(this.x, this.y, this.targetBase.x, this.targetBase.y);
+                return distance < this.size/2 + this.targetBase.width/2;
+            }
+        }
+
+        class Missile {
+            constructor(startX, startY, targetX, targetY) {
+                this.x = startX;
+                this.y = startY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+
+                // Calculate trajectory
+                const dx = targetX - startX;
+                const dy = targetY - startY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                this.vx = (dx / distance) * MISSILE_SPEED;
+                this.vy = (dy / distance) * MISSILE_SPEED;
+
+                this.trail = [];
+            }
+
+            update() {
+                // Add current position to trail
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > 10) {
+                    this.trail.shift();
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            render() {
+                push();
+
+                // Draw trail
+                for (let i = 0; i < this.trail.length; i++) {
+                    const alpha = map(i, 0, this.trail.length - 1, 0, 100);
+                    stroke(180, 100, 100, alpha);
+                    strokeWeight(2);
+                    point(this.trail[i].x, this.trail[i].y);
+                }
+
+                // Draw missile
+                fill(180, 100, 100);
+                noStroke();
+                ellipse(this.x, this.y, 6);
+
+                pop();
+            }
+
+            hasReachedTarget() {
+                const distance = dist(this.x, this.y, this.targetX, this.targetY);
+                return distance < 10;
+            }
+
+            isOffScreen() {
+                return this.x < -50 || this.x > width + 50 || this.y < -50 || this.y > height + 50;
+            }
+        }
+
+        class Explosion {
+            constructor(x, y, maxRadius) {
+                this.x = x;
+                this.y = y;
+                this.maxRadius = maxRadius;
+                this.currentRadius = 0;
+                this.life = EXPLOSION_DURATION;
+                this.maxLife = EXPLOSION_DURATION;
+            }
+
+            update() {
+                this.life--;
+                this.currentRadius = map(this.life, this.maxLife, 0, 0, this.maxRadius);
+            }
+
+            render() {
+                if (this.life > 0) {
+                    push();
+
+                    const alpha = map(this.life, 0, this.maxLife, 0, 80);
+
+                    // Outer ring
+                    stroke(60, 100, 100, alpha);
+                    strokeWeight(3);
+                    noFill();
+                    ellipse(this.x, this.y, this.currentRadius * 2);
+
+                    // Inner glow
+                    fill(60, 100, 100, alpha * 0.3);
+                    noStroke();
+                    ellipse(this.x, this.y, this.currentRadius);
+
+                    pop();
+                }
+            }
+
+            hits(enemy) {
+                if (this.life <= 0) return false;
+                const distance = dist(this.x, this.y, enemy.x, enemy.y);
+                return distance < this.currentRadius + enemy.size/2;
+            }
+
+            isDead() {
+                return this.life <= 0;
+            }
+        }
+    </script>
+</body>
+</html>

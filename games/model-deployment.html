@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deployment Pipeline - Model Deployment Phase</title>
+    <link rel="stylesheet" href="../shared/shared.css">
+    <style>
+        .deployment-status {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px var(--matrix-green-bright);
+        }
+
+        .pipeline-panel {
+            display: flex;
+            gap: 30px;
+        }
+
+        .pipeline-item {
+            text-align: center;
+        }
+
+        .pipeline-label {
+            font-size: 12px;
+            color: var(--matrix-green-medium);
+        }
+
+        .pipeline-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .coming-soon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+        }
+
+        .feature-list {
+            margin-top: 40px;
+            text-align: left;
+            color: var(--matrix-green-medium);
+            line-height: 2;
+        }
+
+        .controls-help {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: var(--matrix-green-dark);
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .deployment-progress {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            height: 20px;
+            border: 2px solid var(--matrix-green-bright);
+            background: transparent;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--matrix-green-bright);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="deployment-status">
+            <div class="pipeline-panel">
+                <div class="pipeline-item">
+                    <div class="pipeline-label">BUILD</div>
+                    <div class="pipeline-value" id="build-status">READY</div>
+                </div>
+                <div class="pipeline-item">
+                    <div class="pipeline-label">TEST</div>
+                    <div class="pipeline-value" id="test-status">PENDING</div>
+                </div>
+                <div class="pipeline-item">
+                    <div class="pipeline-label">DEPLOY</div>
+                    <div class="pipeline-value" id="deploy-status">PENDING</div>
+                </div>
+                <div class="pipeline-item">
+                    <div class="pipeline-label">PHASE</div>
+                    <div class="pipeline-value">DEPLOYMENT</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="coming-soon">
+            <h1 style="font-size: 48px; margin-bottom: 20px; animation: matrix-glow 2s ease-in-out infinite alternate;">
+                DEPLOYMENT PIPELINE
+            </h1>
+            <h2 style="font-size: 24px; margin-bottom: 40px; color: var(--matrix-green-medium);">
+                Coming Soon!
+            </h2>
+
+            <div class="feature-list">
+                <h3 style="color: var(--matrix-green-bright); margin-bottom: 20px;">This game will feature:</h3>
+                <div>• Pac-Man style navigation through deployment maze</div>
+                <div>• Collect CI/CD artifacts while avoiding deployment ghosts</div>
+                <div>• Container orchestration mini-games</div>
+                <div>• Environment management challenges</div>
+                <div>• Rollback strategies when deployments fail</div>
+                <div>• Load balancing and scaling power-ups</div>
+                <div>• Production environment boss level</div>
+            </div>
+
+            <div style="margin-top: 60px;">
+                <button class="nav-button" onclick="simulateDeployment()">
+                    SIMULATE DEPLOYMENT
+                </button>
+            </div>
+        </div>
+
+        <div class="deployment-progress" id="deployment-progress" style="display: none;">
+            <div class="progress-text" id="progress-text">Initializing deployment...</div>
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+
+        <div class="controls-help">
+            <div>SPACE: Simulate Deployment • ESC: Return to Hub</div>
+            <div>Full implementation coming in next update!</div>
+        </div>
+    </div>
+
+    <!-- p5.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+
+    <!-- Shared utilities -->
+    <script src="../shared/shared.js"></script>
+
+    <!-- Game script -->
+    <script>
+        // Model Deployment Game - Deployment Pipeline (Placeholder)
+        // Pac-Man style with CI/CD pipeline mechanics
+
+        let matrixRain;
+        let gameStartTime;
+        let isDeploying = false;
+        let deploymentProgress = 0;
+        let deploymentSteps = [
+            { name: 'Building container...', duration: 1000 },
+            { name: 'Running tests...', duration: 1500 },
+            { name: 'Pushing to registry...', duration: 800 },
+            { name: 'Deploying to staging...', duration: 1200 },
+            { name: 'Running health checks...', duration: 1000 },
+            { name: 'Deploying to production...', duration: 1500 },
+            { name: 'Verifying deployment...', duration: 800 }
+        ];
+        let currentStep = 0;
+
+        function setup() {
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.parent(document.querySelector('.game-container'));
+
+            colorMode(HSB, 360, 100, 100, 100);
+
+            // Initialize matrix background
+            matrixRain = MLOpsUtils.createMatrixRain(canvas.canvas, 30);
+
+            gameStartTime = millis();
+
+            console.log('Model Deployment game (placeholder) initialized');
+        }
+
+        function draw() {
+            background(0, 0, 5);
+
+            // Render matrix background
+            matrixRain.update();
+            matrixRain.render(drawingContext);
+        }
+
+        function simulateDeployment() {
+            if (isDeploying) return;
+
+            isDeploying = true;
+            deploymentProgress = 0;
+            currentStep = 0;
+
+            // Show progress bar
+            document.getElementById('deployment-progress').style.display = 'block';
+            document.querySelector('.coming-soon').style.display = 'none';
+
+            // Update status
+            document.getElementById('build-status').textContent = 'RUNNING';
+            document.getElementById('test-status').textContent = 'PENDING';
+            document.getElementById('deploy-status').textContent = 'PENDING';
+
+            runDeploymentStep();
+        }
+
+        function runDeploymentStep() {
+            if (currentStep >= deploymentSteps.length) {
+                completeDeployment();
+                return;
+            }
+
+            const step = deploymentSteps[currentStep];
+            document.getElementById('progress-text').textContent = step.name;
+
+            // Update status indicators
+            if (currentStep === 0) {
+                document.getElementById('build-status').textContent = 'RUNNING';
+            } else if (currentStep === 1) {
+                document.getElementById('build-status').textContent = 'PASSED';
+                document.getElementById('test-status').textContent = 'RUNNING';
+            } else if (currentStep >= 2) {
+                document.getElementById('test-status').textContent = 'PASSED';
+                document.getElementById('deploy-status').textContent = 'RUNNING';
+            }
+
+            // Animate progress
+            const stepProgress = 100 / deploymentSteps.length;
+            const targetProgress = (currentStep + 1) * stepProgress;
+
+            const progressBar = document.getElementById('progress-bar');
+            progressBar.style.width = targetProgress + '%';
+
+            setTimeout(() => {
+                currentStep++;
+                runDeploymentStep();
+            }, step.duration);
+        }
+
+        function completeDeployment() {
+            document.getElementById('deploy-status').textContent = 'SUCCESS';
+            document.getElementById('progress-text').textContent = 'Deployment complete!';
+
+            const finalScore = Math.floor(7000 - (millis() - gameStartTime) / 10);
+
+            setTimeout(() => {
+                MLOpsNavigation.showCompletionOverlay({
+                    message: 'Model successfully deployed to production! All systems operational.',
+                    score: finalScore,
+                    game: 'model-deployment'
+                }, () => {
+                    const gameData = {
+                        game: 'model-deployment',
+                        score: finalScore,
+                        completed: true,
+                        timeSpent: millis() - gameStartTime,
+                        message: 'Model deployment pipeline executed successfully!'
+                    };
+
+                    MLOpsNavigation.returnToHub(gameData);
+                });
+            }, 1000);
+        }
+
+        function keyPressed() {
+            if (key === ' ') {
+                simulateDeployment();
+            } else if (keyCode === ESCAPE) {
+                const gameData = {
+                    game: 'model-deployment',
+                    score: Math.floor(deploymentProgress * 50),
+                    completed: false,
+                    timeSpent: millis() - gameStartTime
+                };
+
+                MLOpsNavigation.returnToHub(gameData);
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            matrixRain = MLOpsUtils.createMatrixRain(canvas.canvas, 30);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural Network Training - Model Training Phase</title>
+    <link rel="stylesheet" href="../shared/shared.css">
+    <style>
+        .training-status {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            z-index: 100;
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px var(--matrix-green-bright);
+        }
+
+        .metrics-panel {
+            display: flex;
+            gap: 30px;
+        }
+
+        .metric-item {
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--matrix-green-medium);
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .coming-soon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+        }
+
+        .feature-list {
+            margin-top: 40px;
+            text-align: left;
+            color: var(--matrix-green-medium);
+            line-height: 2;
+        }
+
+        .controls-help {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: var(--matrix-green-dark);
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="training-status">
+            <div class="metrics-panel">
+                <div class="metric-item">
+                    <div class="metric-label">ACCURACY</div>
+                    <div class="metric-value" id="accuracy">0.00%</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">EPOCH</div>
+                    <div class="metric-value" id="epoch">0</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">LOSS</div>
+                    <div class="metric-value" id="loss">1.000</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">PHASE</div>
+                    <div class="metric-value">TRAINING</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="coming-soon">
+            <h1 style="font-size: 48px; margin-bottom: 20px; animation: matrix-glow 2s ease-in-out infinite alternate;">
+                NEURAL NETWORK TRAINING
+            </h1>
+            <h2 style="font-size: 24px; margin-bottom: 40px; color: var(--matrix-green-medium);">
+                Coming Soon!
+            </h2>
+
+            <div class="feature-list">
+                <h3 style="color: var(--matrix-green-bright); margin-bottom: 20px;">This game will feature:</h3>
+                <div>• Space Invaders-style gameplay with neural network nodes as enemies</div>
+                <div>• Hyperparameter bullets to optimize model performance</div>
+                <div>• Training accuracy progression as score system</div>
+                <div>• Overfitting enemies that require careful strategy</div>
+                <div>• Validation checkpoints and early stopping mechanics</div>
+                <div>• Gradient descent power-ups for faster learning</div>
+                <div>• Boss battles against complex model architectures</div>
+            </div>
+
+            <div style="margin-top: 60px;">
+                <button class="nav-button" onclick="simulateTraining()">
+                    SIMULATE TRAINING SESSION
+                </button>
+            </div>
+        </div>
+
+        <div class="controls-help">
+            <div>SPACE: Simulate Training • ESC: Return to Hub</div>
+            <div>Full implementation coming in next update!</div>
+        </div>
+    </div>
+
+    <!-- p5.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+
+    <!-- Shared utilities -->
+    <script src="../shared/shared.js"></script>
+
+    <!-- Game script -->
+    <script>
+        // Model Training Game - Neural Network Training (Placeholder)
+        // Space Invaders style with neural network training mechanics
+
+        let matrixStreams = [];
+        let gameStartTime;
+        let isTraining = false;
+        let accuracy = 0;
+        let epoch = 0;
+        let loss = 1.0;
+        let trainingInterval;
+
+        function setup() {
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.parent(document.querySelector('.game-container'));
+
+            colorMode(HSB, 360, 100, 100, 100);
+
+            // Initialize matrix background (original implementation)
+            const matrixRain = MLOpsUtils.createMatrixRain(16, 10, 30);
+            matrixStreams = matrixRain.streams;
+
+            gameStartTime = millis();
+
+            console.log('Model Training game (placeholder) initialized');
+        }
+
+        function draw() {
+            background(0, 0, 5);
+
+            // Render matrix background
+            matrixRain.update();
+            matrixRain.render(drawingContext);
+
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('accuracy').textContent = (accuracy * 100).toFixed(2) + '%';
+            document.getElementById('epoch').textContent = epoch;
+            document.getElementById('loss').textContent = loss.toFixed(3);
+        }
+
+        function simulateTraining() {
+            if (isTraining) return;
+
+            isTraining = true;
+            accuracy = 0;
+            epoch = 0;
+            loss = 1.0;
+
+            // Simulate training progress
+            trainingInterval = setInterval(() => {
+                epoch++;
+                accuracy = Math.min(0.95, accuracy + Math.random() * 0.05);
+                loss = Math.max(0.01, loss - Math.random() * 0.05);
+
+                if (epoch >= 20 || accuracy >= 0.90) {
+                    clearInterval(trainingInterval);
+                    isTraining = false;
+                    completeTraining();
+                }
+            }, 200);
+        }
+
+        function completeTraining() {
+            const finalScore = Math.floor(accuracy * 10000 + (20 - epoch) * 100);
+
+            MLOpsNavigation.showCompletionOverlay({
+                message: 'Neural network training simulation complete! Model achieved good accuracy.',
+                score: finalScore,
+                game: 'model-training'
+            }, () => {
+                const gameData = {
+                    game: 'model-training',
+                    score: finalScore,
+                    completed: true,
+                    timeSpent: millis() - gameStartTime,
+                    message: 'Neural network successfully trained! Ready for deployment.'
+                };
+
+                MLOpsNavigation.returnToHub(gameData);
+            });
+        }
+
+        function keyPressed() {
+            if (key === ' ') {
+                simulateTraining();
+            } else if (keyCode === ESCAPE) {
+                if (trainingInterval) {
+                    clearInterval(trainingInterval);
+                }
+
+                const gameData = {
+                    game: 'model-training',
+                    score: Math.floor(accuracy * 10000),
+                    completed: false,
+                    timeSpent: millis() - gameStartTime
+                };
+
+                MLOpsNavigation.returnToHub(gameData);
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            matrixRain = MLOpsUtils.createMatrixRain(canvas.canvas, 30);
+        }
+    </script>
+</body>
+</html>
