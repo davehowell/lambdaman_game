@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Forge - Feature Engineering Phase</title>
+    <link rel="stylesheet" href="../shared/shared.css">
+    <style>
+        .game-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+            text-align: right;
+            text-shadow: 0 0 10px var(--matrix-green-bright);
+        }
+
+        .powerup-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            color: var(--matrix-green-bright);
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            text-shadow: 0 0 20px var(--matrix-green-bright);
+            animation: matrix-glow 1s ease-in-out infinite alternate;
+        }
+
+        .controls-help {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            color: var(--matrix-green-dark);
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-ui">
+            <div class="score-display">SCORE: <span id="score">00000000</span></div>
+            <div class="lives-display">LEVEL: <span id="level">1</span></div>
+            <div class="level-display">PHASE: FEATURE ENGINEERING</div>
+        </div>
+
+        <div class="game-info">
+            <div>HERO: <span id="current-hero">LAMBDA MAN</span></div>
+            <div id="powerup-status" style="display: none;">TRACTOR BEAM ACTIVE</div>
+        </div>
+
+        <div id="powerup-indicator" class="powerup-indicator" style="display: none;">
+            <div style="font-size: 24px; margin-bottom: 10px;">FEATURE ENGINEERING MODE!</div>
+            <div style="font-size: 18px;">Use arrow keys to forge features</div>
+        </div>
+
+        <div class="controls-help">
+            <div>ARROW KEYS: Move/Rotate • SPACE: Hard Drop</div>
+            <div>P/ESC: Pause • Engineer features from raw data!</div>
+        </div>
+    </div>
+
+    <!-- p5.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+
+    <!-- Shared utilities -->
+    <script src="../shared/shared.js"></script>
+
+    <!-- Game classes -->
+    <script src="feature-engineering-classes.js"></script>
+
+    <!-- Game script -->
+    <script>
+        // Feature Engineering Game - Tetris Style
+        // Engineer features from raw data blocks
+
+        // Game state
+        let gameState = 'playing'; // 'playing', 'paused', 'heroSwap', 'gameOver', 'victory'
+        let score = 0;
+        let level = 1;
+        let gameOver = false;
+        let gameStartTime;
+
+        // Game objects
+        let matrixStreams = [];
+        let fireworks = [];
+
+        // Hero system
+        let heroImages = [];
+        let heroNames = [];
+        let heroFaceImages = [];
+        let selectedHero = 0;
+
+        // Tetris game constants
+        const COLS = 10;
+        const ROWS = 20;
+        const BLOCK_SIZE = 30;
+        const UI_WIDTH = 300;
+
+        // Tetris game state
+        let grid = null;
+        let currentPiece = null;
+        let nextPiece = null;
+        let fallInterval = 1000;
+        let lastFallTime = 0;
+        let linesCleared = 0;
+
+        // Hero and tractor beam effects
+        let tractorBeamActive = false;
+        let tractorBeamIntensity = 0;
+        let heroPositionX = 0;
+        let heroPositionY = 0;
+
+        // Tetromino shapes and colors
+        const PIECE_TYPES = 'IOTSLJZ';
+        const PIECE_SHAPES = {
+            'I': [[1, 1, 1, 1]],
+            'O': [[1, 1], [1, 1]],
+            'T': [[0, 1, 0], [1, 1, 1]],
+            'S': [[0, 1, 1], [1, 1, 0]],
+            'Z': [[1, 1, 0], [0, 1, 1]],
+            'J': [[1, 0, 0], [1, 1, 1]],
+            'L': [[0, 0, 1], [1, 1, 1]]
+        };
+
+        const PIECE_COLORS = {
+            'I': [180, 90, 90], // Cyan data streams
+            'O': [120, 85, 85], // Green matrix code
+            'T': [270, 80, 90], // Purple neural paths
+            'S': [150, 90, 80], // Teal feature vectors
+            'Z': [300, 85, 85], // Magenta algorithms
+            'J': [200, 90, 85], // Blue data lakes
+            'L': [60, 80, 90]   // Yellow feature flags
+        };
+
+        const PIECE_WORDS = {
+            'I': 'NORMALIZE',
+            'O': 'ONE-HOT',
+            'T': 'OUTER',
+            'S': 'LEFT',
+            'Z': 'RIGHT',
+            'J': 'INNER',
+            'L': 'JOIN'
+        };
+
+        class Piece {
+            constructor(type) {
+                this.type = type;
+                this.shape = PIECE_SHAPES[type];
+                this.color = PIECE_COLORS[type];
+                this.x = floor(COLS / 2) - floor(this.shape[0].length / 2);
+                this.y = 0;
+                this.rotation = 0;
+            }
+
+            draw(useOwnPosition = true, customPixelX = 0, customPixelY = 0, bSize = BLOCK_SIZE) {
+                // Draw as wireframe
+                noFill();
+                stroke(this.color[0], this.color[1], this.color[2]);
+                strokeWeight(2);
+
+                // First pass: draw all blocks
+                for (let r = 0; r < this.shape.length; r++) {
+                    for (let c = 0; c < this.shape[r].length; c++) {
+                        if (this.shape[r][c]) {
+                            let finalPixelX, finalPixelY;
+                            if (useOwnPosition) {
+                                finalPixelX = (this.x + c) * bSize;
+                                finalPixelY = (this.y + r) * bSize;
+                            } else {
+                                finalPixelX = customPixelX + c * bSize;
+                                finalPixelY = customPixelY + r * bSize;
+                            }
+                            rect(finalPixelX, finalPixelY, bSize, bSize);
+                        }
+                    }
+                }
+
+                // Second pass: draw the word across the piece
+                const word = PIECE_WORDS[this.type];
+                if (word) {
+                    fill(this.color[0], this.color[1], this.color[2]);
+                    noStroke();
+                    textAlign(CENTER, CENTER);
+
+                    // Calculate the center of the piece
+                    let minX = Infinity, maxX = -Infinity;
+                    let minY = Infinity, maxY = -Infinity;
+
+                    for (let r = 0; r < this.shape.length; r++) {
+                        for (let c = 0; c < this.shape[r].length; c++) {
+                            if (this.shape[r][c]) {
+                                let finalPixelX, finalPixelY;
+                                if (useOwnPosition) {
+                                    finalPixelX = (this.x + c) * bSize;
+                                    finalPixelY = (this.y + r) * bSize;
+                                } else {
+                                    finalPixelX = customPixelX + c * bSize;
+                                    finalPixelY = customPixelY + r * bSize;
+                                }
+                                minX = min(minX, finalPixelX);
+                                maxX = max(maxX, finalPixelX + bSize);
+                                minY = min(minY, finalPixelY);
+                                maxY = max(maxY, finalPixelY + bSize);
+                            }
+                        }
+                    }
+
+                    const centerX = (minX + maxX) / 2;
+                    const centerY = (minY + maxY) / 2;
+
+                    let fontSize = bSize * 0.25;
+                    if (this.type === 'O') {
+                        fontSize = bSize * 0.2;
+                    }
+
+                    push();
+                    translate(centerX, centerY);
+                    rotate(radians(this.rotation));
+                    textSize(fontSize);
+                    text(word, 0, 0);
+                    pop();
+                }
+            }
+
+            getRotatedShape() {
+                const newShape = [];
+                for (let c = 0; c < this.shape[0].length; c++) {
+                    newShape.push([]);
+                    for (let r = this.shape.length - 1; r >= 0; r--) {
+                        newShape[c].push(this.shape[r][c]);
+                    }
+                }
+                return newShape;
+            }
+        }
+
+        function getFaceRotation(heroIndex) {
+            let cycleDuration = 6.5 * 60;
+            let animationDuration = 0.5 * 60;
+            let startOffset = heroIndex * 2 * 60;
+            let time = (frameCount + startOffset) % cycleDuration;
+
+            if (time < animationDuration) {
+                let progress = time / animationDuration;
+                return sin(progress * TWO_PI * 2) * 0.3;
+            } else {
+                return 0;
+            }
+        }
+
+        function preload() {
+            const heroFiles = ['Dave.png', 'Nadya.png'];
+            const faceFiles = ['Dave_face.png', 'Nadya_face.png'];
+
+            console.log('Preloading hero images...');
+
+            for (let i = 0; i < heroFiles.length; i++) {
+                const heroPath = '../shared/sprites/' + heroFiles[i];
+                const facePath = '../shared/sprites/' + faceFiles[i];
+
+                console.log(`Loading hero ${i}: ${heroPath}`);
+                heroImages[i] = loadImage(heroPath);
+                heroFaceImages[i] = loadImage(facePath);
+                heroNames[i] = heroFiles[i].replace('.png', '');
+            }
+
+            console.log(`Loaded ${heroImages.length} hero images`);
+        }
+
+        function setup() {
+            console.log('Setting up Feature Engineering game...');
+
+            let canvas = createCanvas(windowWidth, windowHeight);
+            canvas.parent(document.querySelector('.game-container'));
+
+            canvas.elt.setAttribute('tabindex', '0');
+            canvas.elt.style.outline = 'none';
+
+            setTimeout(() => {
+                canvas.elt.focus();
+                console.log('Canvas focused');
+            }, 100);
+
+            canvas.mousePressed(() => {
+                canvas.elt.focus();
+                return false;
+            });
+
+            canvas.elt.addEventListener('touchstart', () => {
+                canvas.elt.focus();
+            });
+
+            colorMode(HSB, 360, 100, 100, 100);
+            angleMode(RADIANS);
+
+            // Initialize Matrix Rain
+            const SYMBOL_SIZE = 16;
+            console.log('Initializing matrix rain...');
+            let x = 0;
+            for (let i = 0; x < width + SYMBOL_SIZE; i++) {
+                let stream = new MatrixStream(x);
+                stream.generateSymbols();
+                matrixStreams.push(stream);
+                x += SYMBOL_SIZE * 0.9;
+            }
+            console.log(`Created ${matrixStreams.length} matrix streams`);
+
+            // Initialize Tetris game
+            resetFeatureEngineering();
+            gameStartTime = millis();
+
+            console.log('Feature Engineering game initialization complete');
+        }
+
+        function resetFeatureEngineering() {
+            console.log("resetFeatureEngineering() called");
+            
+            // Initialize the grid
+            grid = [];
+            for (let r = 0; r < ROWS; r++) {
+                grid[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    grid[r][c] = 0;
+                }
+            }
+
+            score = 0;
+            level = 1;
+            gameOver = false;
+            fallInterval = 1000;
+            lastFallTime = millis();
+            linesCleared = 0;
+
+            // Spawn pieces
+            currentPiece = spawnNewPiece();
+            nextPiece = spawnNewPiece();
+
+            // Initialize hero position
+            heroPositionX = (width - COLS * BLOCK_SIZE) / 2 + COLS * BLOCK_SIZE + UI_WIDTH / 2;
+            heroPositionY = height - 150;
+
+            console.log("Feature Engineering game reset complete");
+        }
+
+        function spawnNewPiece() {
+            const randomType = PIECE_TYPES[floor(random(PIECE_TYPES.length))];
+            return new Piece(randomType);
+        }
+
+        function isValidMove(piece, testX, testY, testShape) {
+            for (let r = 0; r < testShape.length; r++) {
+                for (let c = 0; c < testShape[r].length; c++) {
+                    if (testShape[r][c]) {
+                        const boardX = testX + c;
+                        const boardY = testY + r;
+
+                        if (boardX < 0 || boardX >= COLS || boardY >= ROWS) {
+                            return false;
+                        }
+                        if (boardY >= 0 && grid[boardY][boardX] !== 0) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function lockPiece() {
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c]) {
+                        let gridX = currentPiece.x + c;
+                        let gridY = currentPiece.y + r;
+                        if (gridY >= 0 && gridY < ROWS && gridX >= 0 && gridX < COLS) {
+                            grid[gridY][gridX] = currentPiece.color;
+                        } else if (gridY < 0) {
+                            gameOver = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        function handlePieceLocking() {
+            lockPiece();
+            if (gameOver) {
+                gameState = 'gameOver';
+                return;
+            }
+
+            clearLines();
+            currentPiece = nextPiece;
+            nextPiece = spawnNewPiece();
+
+            currentPiece.x = floor(COLS / 2) - floor(currentPiece.shape[0].length / 2);
+            currentPiece.y = 0;
+
+            if (!isValidMove(currentPiece, currentPiece.x, currentPiece.y, currentPiece.shape)) {
+                gameOver = true;
+                gameState = 'gameOver';
+            }
+            lastFallTime = millis();
+        }
+
+        function clearLines() {
+            let linesClearedThisTurn = 0;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                let isFull = true;
+                for (let c = 0; c < COLS; c++) {
+                    if (grid[r][c] === 0) {
+                        isFull = false;
+                        break;
+                    }
+                }
+                if (isFull) {
+                    grid.splice(r, 1);
+                    grid.unshift(Array(COLS).fill(0));
+                    linesClearedThisTurn++;
+                    r++;
+                }
+            }
+            if (linesClearedThisTurn > 0) {
+                linesCleared += linesClearedThisTurn;
+                if (linesClearedThisTurn === 1) score += 100 * level;
+                else if (linesClearedThisTurn === 2) score += 300 * level;
+                else if (linesClearedThisTurn === 3) score += 500 * level;
+                else if (linesClearedThisTurn >= 4) score += 800 * level;
+
+                level = floor(linesCleared / 10) + 1;
+                fallInterval = max(100, 1000 - (level - 1) * 50);
+
+                // Check victory condition
+                if (linesCleared >= 30) {
+                    gameState = 'victory';
+                }
+            }
+        }
+
+        function draw() {
+            background(220, 10, 10, 35);
+
+            if (gameState === 'playing') {
+                // Render matrix background during gameplay
+                for (let stream of matrixStreams) {
+                    stream.render();
+                }
+                updateGame();
+            } else if (gameState === 'paused') {
+                displayPauseMenu();
+            } else if (gameState === 'heroSwap') {
+                displayHeroSwap();
+            } else if (gameState === 'gameOver') {
+                displayGameOver();
+            } else if (gameState === 'victory') {
+                displayVictory();
+            }
+
+            updateUI();
+        }
+
+        function updateGame() {
+            if (gameOver) return;
+
+            // Update tractor beam intensity
+            if (tractorBeamActive) {
+                tractorBeamIntensity = min(tractorBeamIntensity + 0.1, 1.0);
+            } else {
+                tractorBeamIntensity = max(tractorBeamIntensity - 0.1, 0.0);
+            }
+
+            // Piece falling logic
+            if (millis() - lastFallTime > fallInterval) {
+                if (isValidMove(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
+                    currentPiece.y++;
+                    lastFallTime = millis();
+                } else {
+                    handlePieceLocking();
+                }
+            }
+
+            // Render game
+            renderFeatureEngineering();
+        }
+
+        function renderFeatureEngineering() {
+            // Center the game board
+            push();
+            const totalWidth = COLS * BLOCK_SIZE + UI_WIDTH;
+            const offsetX = (width - totalWidth) / 2;
+            translate(offsetX, 0);
+
+            drawGridAndStaticUI();
+
+            // Draw tractor beam effect
+            if (currentPiece && tractorBeamActive && tractorBeamIntensity > 0) {
+                drawTractorBeam();
+            }
+
+            // Draw current piece
+            if (currentPiece) {
+                currentPiece.draw(true);
+            }
+
+            // Draw hero character
+            drawHero();
+
+            drawScoreAndLevel();
+
+            pop();
+        }
+
+        function drawTractorBeam() {
+            if (!currentPiece) return;
+
+            // Calculate the bottom-right corner of the piece for beam target
+            let maxX = -Infinity;
+            let maxY = -Infinity;
+
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c]) {
+                        let blockX = (currentPiece.x + c) * BLOCK_SIZE;
+                        let blockY = (currentPiece.y + r) * BLOCK_SIZE;
+                        maxX = max(maxX, blockX + BLOCK_SIZE);
+                        maxY = max(maxY, blockY + BLOCK_SIZE);
+                    }
+                }
+            }
+
+            let beamEndX = maxX - 10;
+            let beamEndY = maxY - 10;
+
+            // Calculate hero position (adjusted for centered board)
+            let heroX = COLS * BLOCK_SIZE + UI_WIDTH / 2;
+            let heroY = height - 150;
+
+            // Draw multiple beam lines for effect
+            for (let i = 0; i < 5; i++) {
+                let alpha = (tractorBeamIntensity * 40) * (1 - i * 0.15);
+                let beamWidth = 20 - i * 3;
+
+                stroke(180, 90, 90, alpha);
+                strokeWeight(beamWidth);
+                line(heroX, heroY, beamEndX, beamEndY);
+            }
+
+            // Beam particles
+            for (let i = 0; i < 8; i++) {
+                let t = (frameCount + i * 10) * 0.02;
+                let x = lerp(heroX, beamEndX, (sin(t) + 1) * 0.5);
+                let y = lerp(heroY, beamEndY, (sin(t) + 1) * 0.5);
+
+                let particleAlpha = tractorBeamIntensity * 60;
+                fill(180, 80, 100, particleAlpha);
+                noStroke();
+                circle(x + random(-15, 15), y + random(-15, 15), random(3, 8));
+            }
+        }
+
+        function drawHero() {
+            push();
+            let heroX = COLS * BLOCK_SIZE + UI_WIDTH / 2;
+            let heroY = height - 150;
+            translate(heroX, heroY);
+
+            // Draw the actual hero sprite if available
+            if (heroImages && heroImages[selectedHero]) {
+                imageMode(CENTER);
+                const heroScale = 1.0;
+
+                // Apply rotation when tractor beam is active
+                if (tractorBeamActive && currentPiece) {
+                    let maxX = -Infinity;
+                    let maxY = -Infinity;
+
+                    for (let r = 0; r < currentPiece.shape.length; r++) {
+                        for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                            if (currentPiece.shape[r][c]) {
+                                let blockX = (currentPiece.x + c) * BLOCK_SIZE;
+                                let blockY = (currentPiece.y + r) * BLOCK_SIZE;
+                                maxX = max(maxX, blockX + BLOCK_SIZE);
+                                maxY = max(maxY, blockY + BLOCK_SIZE);
+                            }
+                        }
+                    }
+
+                    let targetX = maxX - 10;
+                    let targetY = maxY - 10;
+                    let angle = atan2(targetY - heroY, targetX - heroX);
+                    rotate(angle - PI/2);
+                }
+
+                image(heroImages[selectedHero], 0, 0,
+                      heroImages[selectedHero].width * heroScale,
+                      heroImages[selectedHero].height * heroScale);
+            } else {
+                // Fallback placeholder
+                fill(120, 90, 100);
+                noStroke();
+                ellipse(0, 0, 40, 50);
+
+                fill(180, 100, 100);
+                textAlign(CENTER, CENTER);
+                textSize(12);
+                text("HERO", 0, 0);
+            }
+
+            pop();
+        }
+
+        function drawGridAndStaticUI() {
+            // Draw grid background
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (grid[r][c] === 0) {
+                        noFill();
+                        stroke(0, 0, 20, 20);
+                        strokeWeight(1);
+                    } else {
+                        noFill();
+                        stroke(grid[r][c][0], grid[r][c][1], grid[r][c][2]);
+                        strokeWeight(2);
+                    }
+                    rect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                }
+            }
+
+            // Draw UI panel
+            const uiX = COLS * BLOCK_SIZE;
+            fill(240, 5, 20);
+            noStroke();
+            rect(uiX, 0, UI_WIDTH, height);
+
+            // Draw next piece preview
+            const previewBoxSize = BLOCK_SIZE * 4;
+            const previewAreaX = uiX + (UI_WIDTH - previewBoxSize) / 2;
+            const previewAreaY = BLOCK_SIZE * 1.5;
+
+            fill(0, 0, 100);
+            textSize(18);
+            textAlign(CENTER, BOTTOM);
+            text("NEXT", previewAreaX + previewBoxSize / 2, previewAreaY - 5);
+
+            fill(240, 5, 10);
+            stroke(0, 0, 5, 30);
+            rect(previewAreaX, previewAreaY, previewBoxSize, previewBoxSize);
+
+            if (nextPiece) {
+                let previewBlockDrawSize = BLOCK_SIZE * 0.75;
+                let shapePixelWidth = nextPiece.shape[0].length * previewBlockDrawSize;
+                let shapePixelHeight = nextPiece.shape.length * previewBlockDrawSize;
+                let pieceRenderX = previewAreaX + (previewBoxSize - shapePixelWidth) / 2;
+                let pieceRenderY = previewAreaY + (previewBoxSize - shapePixelHeight) / 2;
+                nextPiece.draw(false, pieceRenderX, pieceRenderY, previewBlockDrawSize);
+            }
+        }
+
+        function drawScoreAndLevel() {
+            const uiX = COLS * BLOCK_SIZE;
+            const scoreAreaX = uiX + UI_WIDTH / 2;
+            const scoreAreaY = BLOCK_SIZE * 7;
+
+            fill(0, 0, 100);
+            textSize(18);
+            textAlign(CENTER, TOP);
+            text(`Level: ${level}`, scoreAreaX, scoreAreaY);
+            text(`Score: ${score}`, scoreAreaX, scoreAreaY + 25);
+            text(`Lines: ${linesCleared}`, scoreAreaX, scoreAreaY + 50);
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = MLOpsUtils.formatScore(score);
+            document.getElementById('level').textContent = level;
+            document.getElementById('current-hero').textContent = heroNames[selectedHero];
+        }
+
+        function displayPauseMenu() {
+            // Semi-transparent overlay
+            push();
+            fill(0, 0, 0, 50);
+            rect(0, 0, width, height);
+            pop();
+
+            // Pause menu box
+            push();
+            fill(220, 20, 20, 90);
+            stroke(120, 100, 100);
+            strokeWeight(2);
+            rectMode(CENTER);
+            rect(width / 2, height / 2, 400, 350, 10);
+            pop();
+
+            // Title
+            fill(120, 100, 100);
+            textSize(36);
+            textAlign(CENTER, CENTER);
+            text("PAUSED", width / 2, height / 2 - 120);
+
+            // Current hero display with animated face
+            push();
+            translate(width / 2, height / 2 - 50);
+            rotate(getFaceRotation(selectedHero));
+
+            if (heroFaceImages[selectedHero] && heroFaceImages[selectedHero].width > 0) {
+                imageMode(CENTER);
+                let faceScale = 0.6;
+                image(heroFaceImages[selectedHero], 0, 0,
+                      heroFaceImages[selectedHero].width * faceScale,
+                      heroFaceImages[selectedHero].height * faceScale);
+            } else {
+                fill(120, 100, 100);
+                noStroke();
+                circle(0, 0, 60);
+            }
+            pop();
+
+            textSize(16);
+            fill(120, 80, 90);
+            text(`Playing as: ${heroNames[selectedHero]}`, width / 2, height / 2);
+
+            // Menu options
+            textSize(20);
+            fill(120, 90, 100);
+            text("[ENTER] Continue Playing", width / 2, height / 2 + 50);
+            text("[H] Change Hero", width / 2, height / 2 + 80);
+            text("[R] Restart Game", width / 2, height / 2 + 110);
+            text("[M] Main Menu", width / 2, height / 2 + 140);
+        }
+
+        function displayHeroSwap() {
+            // Keep the game visible in background (frozen)
+            for (let stream of matrixStreams) {
+                stream.render();
+            }
+
+            // Semi-transparent overlay
+            push();
+            fill(0, 0, 0, 70);
+            rect(0, 0, width, height);
+            pop();
+
+            // Hero selection box
+            push();
+            fill(220, 20, 20, 90);
+            stroke(120, 100, 100);
+            strokeWeight(2);
+            rectMode(CENTER);
+            let boxWidth = min(600, width * 0.8);
+            let boxHeight = 400;
+            rect(width / 2, height / 2, boxWidth, boxHeight, 10);
+            pop();
+
+            // Title
+            fill(120, 100, 100);
+            textSize(32);
+            textAlign(CENTER, CENTER);
+            text("CHANGE HERO", width / 2, height / 2 - 140);
+
+            textSize(18);
+            fill(120, 80, 90);
+            text("Select a new hero to continue with current progress", width / 2, height / 2 - 100);
+
+            // Calculate spacing for heroes
+            let heroCount = heroImages.length;
+            let spacing = min(200, boxWidth / (heroCount + 1));
+            let startX = width / 2 - (spacing * (heroCount - 1) / 2);
+
+            // Draw all hero options using face images
+            for (let i = 0; i < heroCount && i < heroFaceImages.length; i++) {
+                push();
+                let heroX = startX + spacing * i;
+                let heroY = height / 2;
+
+                // Highlight current hero
+                if (i === selectedHero) {
+                    stroke(120, 100, 100);
+                    strokeWeight(3);
+                    noFill();
+                    ellipse(heroX, heroY, 120, 120);
+                }
+
+                // Apply face animation rotation
+                translate(heroX, heroY);
+                rotate(getFaceRotation(i));
+
+                // Draw hero face if loaded
+                if (heroFaceImages[i] && heroFaceImages[i].width > 0) {
+                    imageMode(CENTER);
+                    let faceScale = 0.6;
+                    image(heroFaceImages[i], 0, 0,
+                          heroFaceImages[i].width * faceScale,
+                          heroFaceImages[i].height * faceScale);
+                } else {
+                    fill(120, 100, 100);
+                    noStroke();
+                    circle(0, 0, 60);
+                }
+                pop();
+
+                // Hero name and key prompt
+                textSize(18);
+                fill(120, 80, 90);
+                text(heroNames[i], heroX, heroY + 70);
+                text(`[${i + 1}]`, heroX, heroY + 90);
+            }
+
+            // Instructions
+            textSize(16);
+            fill(120, 60, 70);
+            text("Press number to select • ESC to cancel", width / 2, height / 2 + 150);
+        }
+
+        function displayGameOver() {
+            // Semi-transparent overlay
+            fill(0, 0, 0, 180);
+            rect(0, 0, width, height);
+
+            push();
+            fill(0, 100, 100);
+            textAlign(CENTER, CENTER);
+            
+            textSize(36);
+            text('FEATURE ENGINEERING FAILED', width/2, height/2 - 60);
+            
+            textSize(48);
+            fill(120, 100, 100);
+            text('MISSION FAILED', width/2, height/2 - 20);
+            
+            textSize(24);
+            fill(120, 70, 80);
+            text(`Final Score: ${score.toString().padStart(8, '0')}`, width/2, height/2 + 40);
+            
+            textSize(18);
+            fill(120, 60, 70);
+            text('Press R to retry or ESC to return to hub', width/2, height/2 + 80);
+            pop();
+        }
+
+        function displayVictory() {
+            // Matrix rain continues
+            for (let stream of matrixStreams) {
+                stream.render();
+            }
+
+            // Create fireworks
+            if (frameCount % 10 === 0) {
+                let x = random(width);
+                let y = random(height * 0.2, height * 0.5);
+                for (let i = 0; i < 50; i++) {
+                    fireworks.push(new Firework(x, y));
+                }
+            }
+
+            // Update and render fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update();
+                fireworks[i].render();
+                if (fireworks[i].isDead()) {
+                    fireworks.splice(i, 1);
+                }
+            }
+
+            // Victory text
+            fill(120, 100, 100);
+            textSize(72);
+            textAlign(CENTER, CENTER);
+            text("FEATURES FORGED!", width / 2, height / 2 - 100);
+
+            textSize(36);
+            fill(180, 80, 90);
+            text("Data Engineered Successfully!", width / 2, height / 2 - 20);
+
+            textSize(24);
+            fill(120, 70, 80);
+            text(`Final Score: ${score}`, width / 2, height / 2 + 40);
+            text(`Hero: ${heroNames[selectedHero]}`, width / 2, height / 2 + 80);
+
+            textSize(20);
+            fill(120, 60, 70);
+            text("Press R to play again", width / 2, height / 2 + 140);
+
+            textSize(16);
+            text("Press ESC to return to hub", width / 2, height / 2 + 170);
+        }
+
+        function keyPressed() {
+            console.log('Key pressed:', key, 'keyCode:', keyCode, 'gameState:', gameState);
+
+            if (gameState === 'playing') {
+                if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
+                    gameState = 'paused';
+                } else {
+                    handleFeatureEngineeringInput();
+                }
+            } else if (gameState === 'paused') {
+                if (keyCode === ENTER) {
+                    gameState = 'playing';
+                } else if (key === 'h' || key === 'H') {
+                    gameState = 'heroSwap';
+                } else if (key === 'r' || key === 'R') {
+                    resetGame();
+                    gameState = 'playing';
+                } else if (key === 'm' || key === 'M') {
+                    returnToHub();
+                }
+            } else if (gameState === 'heroSwap') {
+                let heroIndex = parseInt(key) - 1;
+                if (!isNaN(heroIndex) && heroIndex >= 0 && heroIndex < heroNames.length) {
+                    selectedHero = heroIndex;
+                    gameState = 'playing';
+                } else if (keyCode === ESCAPE) {
+                    gameState = 'paused';
+                }
+            } else if (gameState === 'gameOver') {
+                if (key === 'r' || key === 'R') {
+                    resetGame();
+                } else if (keyCode === ESCAPE) {
+                    returnToHub();
+                }
+            } else if (gameState === 'victory') {
+                if (key === 'r' || key === 'R') {
+                    resetGame();
+                    gameState = 'playing';
+                } else if (keyCode === ESCAPE) {
+                    returnToHub();
+                }
+            }
+        }
+
+        function handleFeatureEngineeringInput() {
+            if (gameOver || !currentPiece) return;
+
+            // Reset tractor beam for new input
+            tractorBeamActive = false;
+
+            if (keyCode === LEFT_ARROW) {
+                tractorBeamActive = true;
+                if (isValidMove(currentPiece, currentPiece.x - 1, currentPiece.y, currentPiece.shape)) {
+                    currentPiece.x--;
+                }
+            } else if (keyCode === RIGHT_ARROW) {
+                tractorBeamActive = true;
+                if (isValidMove(currentPiece, currentPiece.x + 1, currentPiece.y, currentPiece.shape)) {
+                    currentPiece.x++;
+                }
+            } else if (keyCode === DOWN_ARROW) {
+                tractorBeamActive = true;
+                if (isValidMove(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
+                    currentPiece.y++;
+                    score += 1 * level;
+                    lastFallTime = millis();
+                } else {
+                    handlePieceLocking();
+                }
+            } else if (keyCode === UP_ARROW) {
+                tractorBeamActive = true;
+                const rotatedShape = currentPiece.getRotatedShape();
+                if (isValidMove(currentPiece, currentPiece.x, currentPiece.y, rotatedShape)) {
+                    currentPiece.shape = rotatedShape;
+                    currentPiece.rotation = (currentPiece.rotation + 90) % 360;
+                } else {
+                    if (isValidMove(currentPiece, currentPiece.x + 1, currentPiece.y, rotatedShape)) {
+                        currentPiece.x++;
+                        currentPiece.shape = rotatedShape;
+                        currentPiece.rotation = (currentPiece.rotation + 90) % 360;
+                    } else if (isValidMove(currentPiece, currentPiece.x - 1, currentPiece.y, rotatedShape)) {
+                        currentPiece.x--;
+                        currentPiece.shape = rotatedShape;
+                        currentPiece.rotation = (currentPiece.rotation + 90) % 360;
+                    }
+                }
+            } else if (key === ' ') {
+                tractorBeamActive = true;
+                let cellsDropped = 0;
+                while (isValidMove(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
+                    currentPiece.y++;
+                    cellsDropped++;
+                }
+                score += cellsDropped * 2 * level;
+                handlePieceLocking();
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            level = 1;
+            gameOver = false;
+            gameState = 'playing';
+            fireworks = [];
+            tractorBeamActive = false;
+            tractorBeamIntensity = 0;
+            lastFallTime = 0;
+
+            resetFeatureEngineering();
+        }
+
+        function returnToHub() {
+            console.log('Returning to hub...');
+            window.location.href = '../index.html';
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+
+            // Regenerate matrix streams for new size
+            const SYMBOL_SIZE = 16;
+            matrixStreams = [];
+            let x = 0;
+            for (let i = 0; x < width + SYMBOL_SIZE; i++) {
+                let stream = new MatrixStream(x);
+                stream.generateSymbols();
+                matrixStreams.push(stream);
+                x += SYMBOL_SIZE * 0.9;
+            }
+        }
+    </script>
+</body>
+</html>
