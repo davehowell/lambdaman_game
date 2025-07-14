@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MLOps Space Invaders - Model Training & Evaluation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .game-info {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .controls {
+            margin-top: 10px;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-info">
+        <h2>MODEL TRAINING & EVALUATION</h2>
+        <p>Eliminate training data batches to optimize your model!</p>
+    </div>
+
+    <div class="controls">
+        Use ARROW KEYS to move • SPACEBAR to fire • Eliminate all data batches to complete training!
+    </div>
+
+    <script>
+        let player;
+        let bullets = [];
+        let aliens = [];
+        let particles = [];
+        let gameState = 'playing'; // 'playing', 'victory', 'finished'
+        let score = 0;
+        let accuracy = 0;
+        let shotsFired = 0;
+        let hits = 0;
+        let trainingProgress = 0;
+        let victoryTimer = 0;
+        let explosionSequence = [];
+        let explosionIndex = 0;
+        let finalMessage = '';
+
+        function setup() {
+            createCanvas(800, 600);
+
+            // Create player
+            player = {
+                x: width / 2,
+                y: height - 60,
+                size: 30,
+                speed: 5
+            };
+
+            // Create alien formation (3 waves, smaller than classic)
+            createAlienWaves();
+        }
+
+        function createAlienWaves() {
+            // Wave 1 - top row (red = complex data)
+            for (let i = 0; i < 6; i++) {
+                aliens.push({
+                    x: 150 + i * 80,
+                    y: 100,
+                    size: 25,
+                    color: color(255, 100, 100),
+                    label: 'BATCH_' + (i + 1),
+                    alive: true,
+                    points: 30
+                });
+            }
+
+            // Wave 2 - middle row (yellow = medium complexity)
+            for (let i = 0; i < 5; i++) {
+                aliens.push({
+                    x: 190 + i * 80,
+                    y: 160,
+                    size: 22,
+                    color: color(255, 255, 100),
+                    label: 'DATA_' + (i + 1),
+                    alive: true,
+                    points: 20
+                });
+            }
+
+            // Wave 3 - bottom row (green = simple data)
+            for (let i = 0; i < 4; i++) {
+                aliens.push({
+                    x: 230 + i * 80,
+                    y: 220,
+                    size: 20,
+                    color: color(100, 255, 100),
+                    label: 'EASY_' + (i + 1),
+                    alive: true,
+                    points: 10
+                });
+            }
+        }
+
+        function draw() {
+            background(0, 20);
+
+            // Draw grid background (like a loss function graph)
+            drawGrid();
+
+            if (gameState === 'playing') {
+                updateGame();
+                drawGame();
+                checkWinCondition();
+            } else if (gameState === 'victory') {
+                updateVictorySequence();
+                drawGame();
+                drawVictorySequence();
+            } else if (gameState === 'finished') {
+                drawFinalScreen();
+            }
+        }
+
+        function drawGrid() {
+            stroke(0, 100, 0, 30);
+            strokeWeight(1);
+
+            // Vertical lines
+            for (let x = 0; x < width; x += 40) {
+                line(x, 0, x, height);
+            }
+
+            // Horizontal lines
+            for (let y = 0; y < height; y += 40) {
+                line(0, y, width, y);
+            }
+        }
+
+        function updateGame() {
+            // Update player
+            if (keyIsDown(LEFT_ARROW) && player.x > player.size/2) {
+                player.x -= player.speed;
+            }
+            if (keyIsDown(RIGHT_ARROW) && player.x < width - player.size/2) {
+                player.x += player.speed;
+            }
+
+            // Update bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y -= bullets[i].speed;
+
+                // Remove bullets that go off screen
+                if (bullets[i].y < 0) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Check collision with aliens
+                for (let j = 0; j < aliens.length; j++) {
+                    if (aliens[j].alive &&
+                        dist(bullets[i].x, bullets[i].y, aliens[j].x, aliens[j].y) < aliens[j].size) {
+
+                        // Hit!
+                        hits++;
+                        score += aliens[j].points;
+                        aliens[j].alive = false;
+
+                        // Create explosion particles
+                        createExplosion(aliens[j].x, aliens[j].y, aliens[j].color);
+
+                        bullets.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].isDead()) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Calculate accuracy
+            if (shotsFired > 0) {
+                accuracy = (hits / shotsFired * 100);
+            }
+
+            // Calculate training progress
+            let totalAliens = aliens.length;
+            let deadAliens = aliens.filter(a => !a.alive).length;
+            trainingProgress = (deadAliens / totalAliens * 100);
+        }
+
+        function drawGame() {
+            // Draw player (model/algorithm)
+            fill(0, 255, 255);
+            noStroke();
+
+            // Draw player as a triangle (spaceship)
+            push();
+            translate(player.x, player.y);
+            triangle(0, -player.size/2, -player.size/3, player.size/2, player.size/3, player.size/2);
+            pop();
+
+            // Draw "MODEL" label under player
+            fill(0, 255, 255);
+            textAlign(CENTER);
+            textSize(10);
+            text('MODEL', player.x, player.y + 25);
+
+            // Draw bullets
+            fill(255, 255, 0);
+            for (let bullet of bullets) {
+                ellipse(bullet.x, bullet.y, 4, 8);
+            }
+
+            // Draw aliens (data batches)
+            for (let alien of aliens) {
+                if (alien.alive) {
+                    fill(alien.color);
+                    rectMode(CENTER);
+                    rect(alien.x, alien.y, alien.size, alien.size);
+
+                    // Draw label
+                    fill(255);
+                    textAlign(CENTER);
+                    textSize(8);
+                    text(alien.label, alien.x, alien.y + alien.size/2 + 12);
+                }
+            }
+
+            // Draw particles
+            for (let particle of particles) {
+                particle.draw();
+            }
+
+            // Draw UI
+            drawUI();
+        }
+
+        function drawUI() {
+            // Training metrics
+            fill(0, 255, 0);
+            textAlign(LEFT);
+            textSize(14);
+            text(`TRAINING PROGRESS: ${trainingProgress.toFixed(1)}%`, 10, 30);
+            text(`ACCURACY: ${accuracy.toFixed(1)}%`, 10, 50);
+            text(`BATCHES PROCESSED: ${hits}/${aliens.length}`, 10, 70);
+
+            // Progress bar
+            stroke(0, 255, 0);
+            strokeWeight(2);
+            noFill();
+            rect(10, 80, 200, 10);
+
+            fill(0, 255, 0);
+            noStroke();
+            rect(10, 80, (trainingProgress / 100) * 200, 10);
+        }
+
+        function checkWinCondition() {
+            if (aliens.every(alien => !alien.alive)) {
+                gameState = 'victory';
+                victoryTimer = 0;
+
+                // Create spectacular finish sequence
+                finalMessage = 'MODEL TRAINING COMPLETE!';
+
+                // Create victory particles
+                for (let i = 0; i < 50; i++) {
+                    particles.push(new Particle(width/2, height/2, color(0, 255, 255), true));
+                }
+            }
+        }
+
+        function updateVictorySequence() {
+            victoryTimer++;
+
+            if (victoryTimer > 180) { // 3 seconds
+                gameState = 'finished';
+            }
+        }
+
+        function drawVictorySequence() {
+            // Flash effect
+            if (frameCount % 10 < 5) {
+                fill(0, 255, 0, 50);
+                rect(0, 0, width, height);
+            }
+
+            // Victory message
+            fill(0, 255, 255);
+            textAlign(CENTER);
+            textSize(32);
+            text(finalMessage, width/2, height/2 - 50);
+
+            textSize(18);
+            text(`FINAL ACCURACY: ${accuracy.toFixed(1)}%`, width/2, height/2);
+            text(`MODEL READY FOR DEPLOYMENT!`, width/2, height/2 + 30);
+        }
+
+        function drawFinalScreen() {
+            background(0, 150, 0, 200);
+
+            fill(255);
+            textAlign(CENTER);
+            textSize(24);
+            text('🎯 TRAINING SUCCESSFUL! 🎯', width/2, height/2 - 60);
+
+            textSize(16);
+            text('Your model has learned to classify data with high accuracy!', width/2, height/2 - 20);
+            text('Ready to move to the next phase: MODEL DEPLOYMENT', width/2, height/2 + 10);
+
+            textSize(12);
+            text('Press R to retrain the model', width/2, height/2 + 50);
+        }
+
+        function createExplosion(x, y, col) {
+            for (let i = 0; i < 8; i++) {
+                particles.push(new Particle(x, y, col, false));
+            }
+        }
+
+        function keyPressed() {
+            if (key === ' ' && gameState === 'playing') {
+                // Fire bullet
+                bullets.push({
+                    x: player.x,
+                    y: player.y - player.size/2,
+                    speed: 8
+                });
+                shotsFired++;
+            }
+
+            if (key === 'r' || key === 'R') {
+                // Restart game
+                resetGame();
+            }
+        }
+
+        function resetGame() {
+            bullets = [];
+            aliens = [];
+            particles = [];
+            gameState = 'playing';
+            score = 0;
+            accuracy = 0;
+            shotsFired = 0;
+            hits = 0;
+            trainingProgress = 0;
+            victoryTimer = 0;
+
+            player.x = width / 2;
+            createAlienWaves();
+        }
+
+        // Particle class for explosions and effects
+        class Particle {
+            constructor(x, y, col, isVictory = false) {
+                this.x = x;
+                this.y = y;
+                this.vx = random(-5, 5);
+                this.vy = random(-5, 5);
+                this.color = col;
+                this.life = 255;
+                this.size = random(3, 8);
+                this.isVictory = isVictory;
+
+                if (isVictory) {
+                    this.vx = random(-3, 3);
+                    this.vy = random(-8, -2);
+                    this.size = random(5, 12);
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.isVictory ? 3 : 8;
+
+                if (this.isVictory) {
+                    this.vy += 0.1; // gravity
+                }
+            }
+
+            draw() {
+                push();
+                fill(red(this.color), green(this.color), blue(this.color), this.life);
+                noStroke();
+                ellipse(this.x, this.y, this.size);
+                pop();
+            }
+
+            isDead() {
+                return this.life <= 0;
+            }
+        }
+    </script>
+</body>
+</html>

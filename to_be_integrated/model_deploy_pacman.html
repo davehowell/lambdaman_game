@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MLOps Pac-Man - Model Deployment</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #ffff00;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .game-info {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .controls {
+            margin-top: 10px;
+            font-size: 12px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-info">
+        <h2>MODEL DEPLOYMENT</h2>
+        <p>Navigate your model through production to process all data signals!</p>
+    </div>
+
+    <div class="controls">
+        Use ARROW KEYS to navigate • Collect all DATA signals • Avoid system errors!
+    </div>
+
+    <script>
+        let gridSize = 25;
+        let cols, rows;
+        let pacman;
+        let ghosts = [];
+        let dots = [];
+        let powerPellets = [];
+        let walls = [];
+        let gameState = 'playing'; // 'playing', 'victory', 'gameOver', 'finished'
+        let score = 0;
+        let dotsCollected = 0;
+        let totalDots = 0;
+        let deploymentProgress = 0;
+        let victoryTimer = 0;
+        let particles = [];
+        let powerMode = false;
+        let powerTimer = 0;
+        let uptime = 0;
+
+        // Smaller maze with 1-width paths and 4 powerups in corners
+        let maze = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,3,2,2,2,2,1,2,2,2,2,3,1],
+            [1,2,1,1,1,2,1,2,1,1,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,2,1,1,2,1,1,2,1,2,1],
+            [1,2,2,2,2,0,0,0,2,2,2,2,1],
+            [1,2,1,2,1,1,2,1,1,2,1,2,1],
+            [1,2,2,2,2,2,2,2,2,2,2,2,1],
+            [1,2,1,1,1,2,1,2,1,1,1,2,1],
+            [1,3,2,2,2,2,1,2,2,2,2,3,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        function setup() {
+            createCanvas(800, 600);
+
+            cols = maze[0].length;
+            rows = maze.length;
+
+            // Calculate scaling to fit canvas
+            let scaleX = (width - 100) / (cols * gridSize);
+            let scaleY = (height - 150) / (rows * gridSize);
+            let scale = min(scaleX, scaleY);
+            gridSize = gridSize * scale;
+
+            initializeGame();
+        }
+
+        function initializeGame() {
+            // Clear arrays
+            dots = [];
+            powerPellets = [];
+            walls = [];
+            ghosts = [];
+            particles = [];
+
+            // Parse maze and create objects
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    let x = 50 + col * gridSize + gridSize/2;
+                    let y = 100 + row * gridSize + gridSize/2;
+
+                    if (maze[row][col] === 1) {
+                        walls.push({x: col, y: row});
+                    } else if (maze[row][col] === 2) {
+                        dots.push({
+                            x: x,
+                            y: y,
+                            col: col,
+                            row: row,
+                            collected: false,
+                            label: ['DATA', 'SIGNAL', 'INPUT', 'BATCH', 'STREAM'][Math.floor(Math.random() * 5)]
+                        });
+                    } else if (maze[row][col] === 3) {
+                        powerPellets.push({
+                            x: x,
+                            y: y,
+                            col: col,
+                            row: row,
+                            collected: false,
+                            label: 'MONITOR'
+                        });
+                    }
+                }
+            }
+
+            totalDots = dots.length;
+
+            // Create Pac-Man (the model) - start at exact grid center
+            pacman = {
+                col: 6,
+                row: 7,
+                x: 50 + 6 * gridSize + gridSize/2,
+                y: 100 + 7 * gridSize + gridSize/2,
+                direction: 0, // 0=right, 1=down, 2=left, 3=up
+                nextDirection: 0,
+                moving: false,
+                speed: 3, // Increased for smoother movement
+                mouthAngle: 0
+            };
+
+            // Create 4 ghosts (system errors)
+            let ghostData = [
+                {name: 'LATENCY', color: color(255, 0, 0), startCol: 5, startRow: 5},
+                {name: 'MEMORY', color: color(255, 184, 255), startCol: 6, startRow: 5},
+                {name: 'TIMEOUT', color: color(0, 255, 255), startCol: 7, startRow: 5},
+                {name: 'ERROR', color: color(255, 184, 82), startCol: 8, startRow: 5}
+            ];
+
+            for (let i = 0; i < ghostData.length; i++) {
+                let gData = ghostData[i];
+                ghosts.push({
+                    col: gData.startCol,
+                    row: gData.startRow,
+                    x: 50 + gData.startCol * gridSize + gridSize/2,
+                    y: 100 + gData.startRow * gridSize + gridSize/2,
+                    color: gData.color,
+                    name: gData.name,
+                    direction: Math.floor(Math.random() * 4),
+                    speed: 1.5, // Slower
+                    frightened: false,
+                    frightenedTimer: 0
+                });
+            }
+
+            score = 0;
+            dotsCollected = 0;
+            deploymentProgress = 0;
+            gameState = 'playing';
+            uptime = 0;
+        }
+
+        function draw() {
+            background(0);
+
+            if (gameState === 'playing') {
+                updateGame();
+                drawGame();
+                checkWinCondition();
+                checkGameOver();
+            } else if (gameState === 'victory') {
+                updateVictorySequence();
+                drawGame();
+                drawVictorySequence();
+            } else if (gameState === 'gameOver') {
+                drawGameOver();
+            } else if (gameState === 'finished') {
+                drawFinalScreen();
+            }
+
+            uptime++;
+        }
+
+        function updateGame() {
+            // Handle input
+            handleInput();
+
+            // Update Pac-Man
+            updatePacman();
+
+            // Update power mode - no timer, lasts until victory
+            if (powerMode) {
+                // Power mode stays on until game is won
+                for (let ghost of ghosts) {
+                    ghost.frightened = true;
+                }
+            }
+
+            // Update ghosts
+            for (let ghost of ghosts) {
+                updateGhost(ghost);
+            }
+
+            // Check collisions
+            checkDotCollisions();
+            checkPowerPelletCollisions();
+            checkGhostCollisions();
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].isDead()) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Update deployment progress
+            deploymentProgress = (dotsCollected / totalDots) * 100;
+        }
+
+        function handleInput() {
+            if (keyIsDown(LEFT_ARROW)) {
+                pacman.nextDirection = 2;
+            } else if (keyIsDown(RIGHT_ARROW)) {
+                pacman.nextDirection = 0;
+            } else if (keyIsDown(UP_ARROW)) {
+                pacman.nextDirection = 3;
+            } else if (keyIsDown(DOWN_ARROW)) {
+                pacman.nextDirection = 1;
+            }
+        }
+
+        function updatePacman() {
+            // Ensure pacman is always centered on grid
+            let targetX = 50 + pacman.col * gridSize + gridSize/2;
+            let targetY = 100 + pacman.row * gridSize + gridSize/2;
+
+            // Try to change direction only when perfectly aligned
+            if (pacman.x === targetX && pacman.y === targetY) {
+                if (canMove(pacman.col, pacman.row, pacman.nextDirection)) {
+                    pacman.direction = pacman.nextDirection;
+                }
+            }
+
+            // Move only if perfectly aligned and can move in current direction
+            if (pacman.x === targetX && pacman.y === targetY &&
+                canMove(pacman.col, pacman.row, pacman.direction)) {
+
+                let dx = [1, 0, -1, 0][pacman.direction];
+                let dy = [0, 1, 0, -1][pacman.direction];
+
+                // Move to next grid cell
+                pacman.col += dx;
+                pacman.row += dy;
+                pacman.moving = true;
+            }
+
+            // Smoothly move towards target position
+            let newTargetX = 50 + pacman.col * gridSize + gridSize/2;
+            let newTargetY = 100 + pacman.row * gridSize + gridSize/2;
+
+            if (pacman.x !== newTargetX || pacman.y !== newTargetY) {
+                let moveX = newTargetX - pacman.x;
+                let moveY = newTargetY - pacman.y;
+
+                if (abs(moveX) > 0) {
+                    pacman.x += moveX > 0 ? pacman.speed : -pacman.speed;
+                    if (abs(pacman.x - newTargetX) < pacman.speed) {
+                        pacman.x = newTargetX;
+                    }
+                }
+
+                if (abs(moveY) > 0) {
+                    pacman.y += moveY > 0 ? pacman.speed : -pacman.speed;
+                    if (abs(pacman.y - newTargetY) < pacman.speed) {
+                        pacman.y = newTargetY;
+                    }
+                }
+
+                pacman.moving = true;
+            } else {
+                pacman.moving = false;
+            }
+
+            // Animate mouth
+            if (pacman.moving) {
+                pacman.mouthAngle += 0.3;
+            }
+        }
+
+        function updateGhost(ghost) {
+            // Ensure ghost is centered on grid
+            let targetX = 50 + ghost.col * gridSize + gridSize/2;
+            let targetY = 100 + ghost.row * gridSize + gridSize/2;
+
+            // Change direction when perfectly aligned or can't move (less frequently)
+            if ((ghost.x === targetX && ghost.y === targetY) &&
+                (frameCount % 90 === 0 || !canMove(ghost.col, ghost.row, ghost.direction))) {
+
+                let possibleDirections = [];
+                for (let dir = 0; dir < 4; dir++) {
+                    if (canMove(ghost.col, ghost.row, dir)) {
+                        possibleDirections.push(dir);
+                    }
+                }
+
+                if (possibleDirections.length > 0) {
+                    ghost.direction = random(possibleDirections);
+                }
+            }
+
+            // Move only if aligned and can move
+            if (ghost.x === targetX && ghost.y === targetY &&
+                canMove(ghost.col, ghost.row, ghost.direction)) {
+
+                let dx = [1, 0, -1, 0][ghost.direction];
+                let dy = [0, 1, 0, -1][ghost.direction];
+
+                ghost.col += dx;
+                ghost.row += dy;
+            }
+
+            // Smoothly move towards target position
+            let newTargetX = 50 + ghost.col * gridSize + gridSize/2;
+            let newTargetY = 100 + ghost.row * gridSize + gridSize/2;
+
+            if (ghost.x !== newTargetX || ghost.y !== newTargetY) {
+                let moveX = newTargetX - ghost.x;
+                let moveY = newTargetY - ghost.y;
+                let speed = ghost.frightened ? 1 : 1.5; // Slower ghosts
+
+                if (abs(moveX) > 0) {
+                    ghost.x += moveX > 0 ? speed : -speed;
+                    if (abs(ghost.x - newTargetX) < speed) {
+                        ghost.x = newTargetX;
+                    }
+                }
+
+                if (abs(moveY) > 0) {
+                    ghost.y += moveY > 0 ? speed : -speed;
+                    if (abs(ghost.y - newTargetY) < speed) {
+                        ghost.y = newTargetY;
+                    }
+                }
+            }
+        }
+
+        function canMove(col, row, direction) {
+            let dx = [1, 0, -1, 0][direction];
+            let dy = [0, 1, 0, -1][direction];
+            let newCol = col + dx;
+            let newRow = row + dy;
+
+            // Check bounds
+            if (newCol < 0 || newCol >= cols || newRow < 0 || newRow >= rows) {
+                return false;
+            }
+
+            // Check walls
+            return maze[newRow][newCol] !== 1;
+        }
+
+        function checkDotCollisions() {
+            for (let dot of dots) {
+                if (!dot.collected &&
+                    pacman.col === dot.col && pacman.row === dot.row) {
+                    dot.collected = true;
+                    dotsCollected++;
+                    score += 10;
+
+                    // Create particles
+                    for (let i = 0; i < 5; i++) {
+                        particles.push(new Particle(dot.x, dot.y, color(255, 255, 0)));
+                    }
+                }
+            }
+        }
+
+        function checkPowerPelletCollisions() {
+            for (let pellet of powerPellets) {
+                if (!pellet.collected &&
+                    pacman.col === pellet.col && pacman.row === pellet.row) {
+                    pellet.collected = true;
+                    score += 50;
+
+                    // Activate power mode (monitoring/debugging) - lasts forever!
+                    powerMode = true;
+
+                    // Make ghosts frightened permanently
+                    for (let ghost of ghosts) {
+                        ghost.frightened = true;
+                    }
+
+                    // Create special particles
+                    for (let i = 0; i < 15; i++) {
+                        particles.push(new Particle(pellet.x, pellet.y, color(0, 255, 255)));
+                    }
+                }
+            }
+        }
+
+        function checkGhostCollisions() {
+            for (let ghost of ghosts) {
+                if (pacman.col === ghost.col && pacman.row === ghost.row) {
+                    if (ghost.frightened) {
+                        // Debug/fix the error
+                        score += 200;
+                        // Reset ghost to ghost house and keep them frightened if power mode is active
+                        ghost.col = 6;
+                        ghost.row = 5;
+                        ghost.x = 50 + ghost.col * gridSize + gridSize/2;
+                        ghost.y = 100 + ghost.row * gridSize + gridSize/2;
+                        ghost.frightened = powerMode; // Stay frightened if power mode is still on
+
+                        // Create success particles
+                        for (let i = 0; i < 10; i++) {
+                            particles.push(new Particle(ghost.x, ghost.y, color(0, 255, 0)));
+                        }
+                    } else {
+                        // System error encountered
+                        gameState = 'gameOver';
+                    }
+                }
+            }
+        }
+
+        function drawGame() {
+            // Draw maze walls
+            fill(0, 0, 255);
+            noStroke();
+            for (let wall of walls) {
+                rect(50 + wall.x * gridSize, 100 + wall.y * gridSize, gridSize, gridSize);
+            }
+
+            // Draw dots (data signals)
+            for (let dot of dots) {
+                if (!dot.collected) {
+                    fill(255, 255, 0);
+                    ellipse(dot.x, dot.y, 4, 4);
+
+                    // Label occasionally
+                    if (frameCount % 120 < 60) {
+                        fill(255, 255, 0, 100);
+                        textAlign(CENTER);
+                        textSize(6);
+                        text(dot.label, dot.x, dot.y - 8);
+                    }
+                }
+            }
+
+            // Draw power pellets (monitoring systems)
+            for (let pellet of powerPellets) {
+                if (!pellet.collected) {
+                    fill(0, 255, 255);
+                    ellipse(pellet.x, pellet.y, 12, 12);
+
+                    fill(0, 255, 255, 150);
+                    textAlign(CENTER);
+                    textSize(6);
+                    text(pellet.label, pellet.x, pellet.y - 10);
+                }
+            }
+
+            // Draw ghosts (system errors)
+            for (let ghost of ghosts) {
+                if (ghost.frightened) {
+                    fill(0, 0, 255, 150);
+                } else {
+                    fill(ghost.color);
+                }
+
+                // Ghost body
+                ellipse(ghost.x, ghost.y, gridSize * 0.8, gridSize * 0.8);
+                rect(ghost.x - gridSize * 0.4, ghost.y, gridSize * 0.8, gridSize * 0.3);
+
+                // Ghost bottom wavy edge
+                for (let i = 0; i < 3; i++) {
+                    triangle(
+                        ghost.x - gridSize * 0.4 + i * gridSize * 0.27,
+                        ghost.y + gridSize * 0.3,
+                        ghost.x - gridSize * 0.4 + (i + 0.5) * gridSize * 0.27,
+                        ghost.y + gridSize * 0.2,
+                        ghost.x - gridSize * 0.4 + (i + 1) * gridSize * 0.27,
+                        ghost.y + gridSize * 0.3
+                    );
+                }
+
+                // Ghost eyes
+                fill(255);
+                ellipse(ghost.x - 4, ghost.y - 2, 4, 4);
+                ellipse(ghost.x + 4, ghost.y - 2, 4, 4);
+
+                // Label
+                fill(255);
+                textAlign(CENTER);
+                textSize(8);
+                text(ghost.name, ghost.x, ghost.y + gridSize/2 + 12);
+            }
+
+            // Draw Pac-Man (the model)
+            fill(255, 255, 0);
+
+            let angle = pacman.direction * PI/2;
+            let mouthSize = sin(pacman.mouthAngle) * PI/3;
+
+            push();
+            translate(pacman.x, pacman.y);
+            rotate(angle);
+
+            if (pacman.moving && mouthSize > 0) {
+                arc(0, 0, gridSize * 0.8, gridSize * 0.8, mouthSize/2, TWO_PI - mouthSize/2);
+            } else {
+                ellipse(0, 0, gridSize * 0.8, gridSize * 0.8);
+            }
+            pop();
+
+            // Model label
+            fill(255, 255, 0);
+            textAlign(CENTER);
+            textSize(10);
+            text('MODEL', pacman.x, pacman.y + gridSize/2 + 15);
+
+            // Draw particles
+            for (let particle of particles) {
+                particle.draw();
+            }
+
+            // Draw UI
+            drawUI();
+        }
+
+        function drawUI() {
+            // Deployment metrics
+            fill(255, 255, 0);
+            textAlign(LEFT);
+            textSize(14);
+            text(`DEPLOYMENT PROGRESS: ${deploymentProgress.toFixed(1)}%`, 10, 30);
+            text(`SIGNALS PROCESSED: ${dotsCollected}/${totalDots}`, 10, 50);
+            text(`UPTIME: ${(uptime/60).toFixed(1)}s`, 10, 70);
+
+            if (powerMode) {
+                fill(0, 255, 255);
+                text(`MONITORING: ACTIVE`, 400, 30);
+            }
+
+            // Progress bar
+            stroke(255, 255, 0);
+            strokeWeight(2);
+            noFill();
+            rect(10, 80, 200, 10);
+
+            fill(255, 255, 0);
+            noStroke();
+            rect(10, 80, (deploymentProgress / 100) * 200, 10);
+        }
+
+        function checkWinCondition() {
+            if (dotsCollected >= totalDots) {
+                gameState = 'victory';
+                victoryTimer = 0;
+            }
+        }
+
+        function checkGameOver() {
+            // This is handled in checkGhostCollisions
+        }
+
+        function updateVictorySequence() {
+            victoryTimer++;
+
+            if (victoryTimer === 1) {
+                // Create victory celebration
+                for (let i = 0; i < 50; i++) {
+                    particles.push(new Particle(
+                        pacman.x + random(-50, 50),
+                        pacman.y + random(-50, 50),
+                        color(255, 255, 0)
+                    ));
+                }
+            }
+
+            if (victoryTimer > 180) { // 3 seconds
+                gameState = 'finished';
+            }
+        }
+
+        function drawVictorySequence() {
+            // Flash effect
+            if (frameCount % 20 < 10) {
+                fill(255, 255, 0, 30);
+                rect(0, 0, width, height);
+            }
+
+            // Victory message
+            fill(0, 255, 0);
+            textAlign(CENTER);
+            textSize(32);
+            text('DEPLOYMENT SUCCESSFUL!', width/2, height - 100);
+
+            textSize(18);
+            text(`ALL DATA SIGNALS PROCESSED!`, width/2, height - 70);
+            text(`MODEL RUNNING IN PRODUCTION!`, width/2, height - 40);
+        }
+
+        function drawGameOver() {
+            background(255, 0, 0, 200);
+
+            fill(255);
+            textAlign(CENTER);
+            textSize(24);
+            text('⚠️ DEPLOYMENT FAILED ⚠️', width/2, height/2 - 60);
+
+            textSize(16);
+            text('System error encountered during deployment!', width/2, height/2 - 20);
+            text('Model needs debugging and redeployment.', width/2, height/2 + 10);
+
+            textSize(12);
+            text('Press R to redeploy the model', width/2, height/2 + 50);
+        }
+
+        function drawFinalScreen() {
+            background(0, 200, 0, 200);
+
+            fill(255);
+            textAlign(CENTER);
+            textSize(24);
+            text('🚀 MODEL SUCCESSFULLY DEPLOYED! 🚀', width/2, height/2 - 60);
+
+            textSize(16);
+            text('Your model is now processing real-world data in production!', width/2, height/2 - 20);
+            text('Ready to move to the next phase: MODEL MONITORING', width/2, height/2 + 10);
+
+            textSize(12);
+            text('Press R to redeploy with a new model', width/2, height/2 + 50);
+        }
+
+        function keyPressed() {
+            if (key === 'r' || key === 'R') {
+                initializeGame();
+            }
+        }
+
+        // Particle class for effects
+        class Particle {
+            constructor(x, y, col) {
+                this.x = x;
+                this.y = y;
+                this.vx = random(-3, 3);
+                this.vy = random(-3, 3);
+                this.color = col;
+                this.life = 255;
+                this.size = random(2, 6);
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= 5;
+                this.vy += 0.1; // gravity
+            }
+
+            draw() {
+                push();
+                fill(red(this.color), green(this.color), blue(this.color), this.life);
+                noStroke();
+                ellipse(this.x, this.y, this.size);
+                pop();
+            }
+
+            isDead() {
+                return this.life <= 0;
+            }
+        }
+    </script>
+</body>
+</html>
