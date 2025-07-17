@@ -6,12 +6,18 @@ A Matrix-themed ML Operations workflow presentation system featuring 5 retro arc
 ## Project Purpose
 Created for a data team presentation to illustrate the team's role in the ML operations workflow through interactive game metaphors. Each game represents a critical phase: Data Cleaning, Feature Engineering, Model Training, Model Deployment, and Model Monitoring.
 
-## Current Progress (2025-07-09)
-- **✅ Data Cleaning (Asteroids)** - COMPLETE
-- **✅ Feature Engineering (Tetris)** - COMPLETE  
-- **🎯 Model Monitoring (Missile Command)** - NEXT PRIORITY
-- **⏳ Model Deployment (Pac-Man)** - TODO
+## Current Progress (2025-07-17)
+- **✅ Feature Engineering (Asteroids)** - COMPLETE (renamed from Data Cleaning)
+- **✅ Model Monitoring (Missile Command)** - COMPLETE (all bugs fixed)
+- **✅ Landing Page Layout** - COMPLETE (simplified linear design)
 - **⏳ Model Training (Space Invaders)** - TODO
+- **⏳ Model Deployment (Pac-Man)** - TODO
+
+## Major Restructuring (2025-07-17)
+- **Simplified to 4-game structure** (removed janky Tetris game)
+- **Games Completed:** 2/4 (50%)
+- **Landing Page:** Clean linear layout with larger tiles - COMPLETE
+- **Next Focus:** Complete remaining 2 games
 
 ## Project Architecture
 
@@ -140,17 +146,19 @@ lambdaman_game/
 ## Important Notes
 
 ### For Next Session
-1. **Current Task:** Port Model Monitoring (Missile Command)
-2. **Source File:** `to_be_integrated/missle_command_example.js`
-3. **Template:** Use `games/data-cleaning.html` structure
-4. **Priority:** This is game 3 of 5 in the workflow
+1. **Current Task:** Complete remaining 2 games
+2. **Priority 1:** Model Training (Space Invaders) - complex implementation needed
+3. **Priority 2:** Model Deployment (Pac-Man) - simpler port from existing
+4. **Landing Page:** Now has clean linear layout that works well for MacBook presentations
 
 ### Key Decisions Made
-- Tetris pieces show data engineering terms (NORMALIZE, ONE-HOT, etc.)
-- Heroes have tractor beam effects in Feature Engineering
-- Victory conditions are game-appropriate (30 lines for Tetris)
+- Feature Engineering uses Asteroids gameplay with data engineering theme
+- Heroes have tractor beam effects in Feature Engineering  
+- Victory conditions are game-appropriate for each phase
 - All games maintain Matrix green theme consistency
 - Simple navigation back to hub (no complex completion overlays)
+- Landing page uses simple linear layout instead of complex SVG pipeline
+- Tiles sized properly for MacBook presentation (320x280px with larger text)
 
 ### Testing Checklist
 - [ ] Game loads and initializes properly
