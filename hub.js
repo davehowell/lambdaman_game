@@ -3,19 +3,10 @@
 // Workflow phases configuration
 const workflowPhases = [
     {
-        id: 'data-cleaning',
-        title: 'Bad Data Matrix',
-        subtitle: 'Data Cleaning Phase',
-        description: 'Fight corrupted data in the matrix. Use SQL commands to eliminate bad data asteroids.',
-        gameFile: 'games/data-cleaning.html',
-        completed: false,
-        score: 0
-    },
-    {
         id: 'feature-engineering',
-        title: 'Feature Forge',
-        subtitle: 'Feature Engineering Phase', 
-        description: 'Build and shape data features like Tetris blocks. Engineer the perfect dataset.',
+        title: 'Feature Engineering Matrix',
+        subtitle: 'Feature Engineering Phase',
+        description: 'Fight corrupted data in the matrix. Use SQL commands to eliminate bad data and engineer clean features.',
         gameFile: 'games/feature-engineering.html',
         completed: false,
         score: 0
@@ -87,9 +78,9 @@ function renderHeroGallery() {
     const gallery = document.getElementById('hero-gallery');
     gallery.innerHTML = '';
     
-    teamHeroes.forEach(hero => {
+    teamHeroes.forEach((hero, index) => {
         const heroElement = document.createElement('img');
-        heroElement.className = 'hero-avatar';
+        heroElement.className = `hero-avatar hero-avatar-${index + 1}`;
         heroElement.src = MLOpsSprites.heroes[hero.sprite];
         heroElement.alt = hero.name;
         heroElement.title = hero.name;
