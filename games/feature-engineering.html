@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feature Forge - Feature Engineering Phase</title>
+    <title>Feature Engineering Matrix - Feature Engineering Phase</title>
     <link rel="stylesheet" href="../shared/shared.css">
     <style>
         .game-info {
@@ -46,23 +46,23 @@
     <div class="game-container">
         <div class="game-ui">
             <div class="score-display">SCORE: <span id="score">00000000</span></div>
-            <div class="lives-display">LEVEL: <span id="level">1</span></div>
+            <div class="lives-display">LIVES: <span id="lives">3</span></div>
             <div class="level-display">PHASE: FEATURE ENGINEERING</div>
         </div>
 
         <div class="game-info">
             <div>HERO: <span id="current-hero">LAMBDA MAN</span></div>
-            <div id="powerup-status" style="display: none;">TRACTOR BEAM ACTIVE</div>
+            <div id="powerup-status" style="display: none;">DATABASE CLEANER READY</div>
         </div>
 
         <div id="powerup-indicator" class="powerup-indicator" style="display: none;">
-            <div style="font-size: 24px; margin-bottom: 10px;">FEATURE ENGINEERING MODE!</div>
-            <div style="font-size: 18px;">Use arrow keys to forge features</div>
+            <div style="font-size: 24px; margin-bottom: 10px;">GEMINI POWERUP COLLECTED!</div>
+            <div style="font-size: 18px;">Press SPACE to unleash Database Cleaner</div>
         </div>
 
         <div class="controls-help">
-            <div>ARROW KEYS: Move/Rotate • SPACE: Hard Drop</div>
-            <div>P/ESC: Pause • Engineer features from raw data!</div>
+            <div>ARROW KEYS: Move • SPACE: Shoot SQL Commands</div>
+            <div>P/ESC: Pause • Eliminate all corrupted data!</div>
         </div>
     </div>
 
@@ -77,19 +77,27 @@
 
     <!-- Game script -->
     <script>
-        // Feature Engineering Game - Tetris Style
-        // Engineer features from raw data blocks
+        // Feature Engineering Game - Asteroids Style
+        // Fight corrupted data in the matrix using SQL commands
 
         // Game state
         let gameState = 'playing'; // 'playing', 'paused', 'heroSwap', 'gameOver', 'victory'
         let score = 0;
-        let level = 1;
+        let lives = 3;
         let gameOver = false;
         let gameStartTime;
 
         // Game objects
+        let player;
+        let bullets = [];
+        let asteroids = [];
         let matrixStreams = [];
+        let powerup = null;
+        let hasPowerup = false;
+        let powerupSpawned = false;
         let fireworks = [];
+        let sqlParticles = [];
+        let asteroidSpawnMultiplier = 1;
 
         // Hero system
         let heroImages = [];
@@ -97,170 +105,31 @@
         let heroFaceImages = [];
         let selectedHero = 0;
 
-        // Tetris game constants
-        const COLS = 10;
-        const ROWS = 20;
-        const BLOCK_SIZE = 30;
-        const UI_WIDTH = 300;
+        // Firing system
+        let lastFireTime = 0;
+        const FIRE_RATE = 8; // Fires per second (8 = 125ms between shots)
 
-        // Tetris game state
-        let grid = null;
-        let currentPiece = null;
-        let nextPiece = null;
-        let fallInterval = 1000;
-        let lastFallTime = 0;
-        let linesCleared = 0;
-
-        // Hero and tractor beam effects
-        let tractorBeamActive = false;
-        let tractorBeamIntensity = 0;
-        let heroPositionX = 0;
-        let heroPositionY = 0;
-
-        // Tetromino shapes and colors
-        const PIECE_TYPES = 'IOTSLJZ';
-        const PIECE_SHAPES = {
-            'I': [[1, 1, 1, 1]],
-            'O': [[1, 1], [1, 1]],
-            'T': [[0, 1, 0], [1, 1, 1]],
-            'S': [[0, 1, 1], [1, 1, 0]],
-            'Z': [[1, 1, 0], [0, 1, 1]],
-            'J': [[1, 0, 0], [1, 1, 1]],
-            'L': [[0, 0, 1], [1, 1, 1]]
-        };
-
-        const PIECE_COLORS = {
-            'I': [180, 90, 90], // Cyan data streams
-            'O': [120, 85, 85], // Green matrix code
-            'T': [270, 80, 90], // Purple neural paths
-            'S': [150, 90, 80], // Teal feature vectors
-            'Z': [300, 85, 85], // Magenta algorithms
-            'J': [200, 90, 85], // Blue data lakes
-            'L': [60, 80, 90]   // Yellow feature flags
-        };
-
-        const PIECE_WORDS = {
-            'I': 'NORMALIZE',
-            'O': 'ONE-HOT',
-            'T': 'OUTER',
-            'S': 'LEFT',
-            'Z': 'RIGHT',
-            'J': 'INNER',
-            'L': 'JOIN'
-        };
-
-        class Piece {
-            constructor(type) {
-                this.type = type;
-                this.shape = PIECE_SHAPES[type];
-                this.color = PIECE_COLORS[type];
-                this.x = floor(COLS / 2) - floor(this.shape[0].length / 2);
-                this.y = 0;
-                this.rotation = 0;
-            }
-
-            draw(useOwnPosition = true, customPixelX = 0, customPixelY = 0, bSize = BLOCK_SIZE) {
-                // Draw as wireframe
-                noFill();
-                stroke(this.color[0], this.color[1], this.color[2]);
-                strokeWeight(2);
-
-                // First pass: draw all blocks
-                for (let r = 0; r < this.shape.length; r++) {
-                    for (let c = 0; c < this.shape[r].length; c++) {
-                        if (this.shape[r][c]) {
-                            let finalPixelX, finalPixelY;
-                            if (useOwnPosition) {
-                                finalPixelX = (this.x + c) * bSize;
-                                finalPixelY = (this.y + r) * bSize;
-                            } else {
-                                finalPixelX = customPixelX + c * bSize;
-                                finalPixelY = customPixelY + r * bSize;
-                            }
-                            rect(finalPixelX, finalPixelY, bSize, bSize);
-                        }
-                    }
-                }
-
-                // Second pass: draw the word across the piece
-                const word = PIECE_WORDS[this.type];
-                if (word) {
-                    fill(this.color[0], this.color[1], this.color[2]);
-                    noStroke();
-                    textAlign(CENTER, CENTER);
-
-                    // Calculate the center of the piece
-                    let minX = Infinity, maxX = -Infinity;
-                    let minY = Infinity, maxY = -Infinity;
-
-                    for (let r = 0; r < this.shape.length; r++) {
-                        for (let c = 0; c < this.shape[r].length; c++) {
-                            if (this.shape[r][c]) {
-                                let finalPixelX, finalPixelY;
-                                if (useOwnPosition) {
-                                    finalPixelX = (this.x + c) * bSize;
-                                    finalPixelY = (this.y + r) * bSize;
-                                } else {
-                                    finalPixelX = customPixelX + c * bSize;
-                                    finalPixelY = customPixelY + r * bSize;
-                                }
-                                minX = min(minX, finalPixelX);
-                                maxX = max(maxX, finalPixelX + bSize);
-                                minY = min(minY, finalPixelY);
-                                maxY = max(maxY, finalPixelY + bSize);
-                            }
-                        }
-                    }
-
-                    const centerX = (minX + maxX) / 2;
-                    const centerY = (minY + maxY) / 2;
-
-                    let fontSize = bSize * 0.25;
-                    if (this.type === 'O') {
-                        fontSize = bSize * 0.2;
-                    }
-
-                    push();
-                    translate(centerX, centerY);
-                    rotate(radians(this.rotation));
-                    textSize(fontSize);
-                    text(word, 0, 0);
-                    pop();
-                }
-            }
-
-            getRotatedShape() {
-                const newShape = [];
-                for (let c = 0; c < this.shape[0].length; c++) {
-                    newShape.push([]);
-                    for (let r = this.shape.length - 1; r >= 0; r--) {
-                        newShape[c].push(this.shape[r][c]);
-                    }
-                }
-                return newShape;
-            }
-        }
-
-        function getFaceRotation(heroIndex) {
-            let cycleDuration = 6.5 * 60;
-            let animationDuration = 0.5 * 60;
-            let startOffset = heroIndex * 2 * 60;
-            let time = (frameCount + startOffset) % cycleDuration;
-
-            if (time < animationDuration) {
-                let progress = time / animationDuration;
-                return sin(progress * TWO_PI * 2) * 0.3;
-            } else {
-                return 0;
-            }
-        }
+        // Game constants
+        const PLAYER_SIZE = 100;
+        const ASTEROID_INIT_NUM = 8;
+        const ASTEROID_INIT_SIZE = 70;
+        const ASTEROID_MIN_SIZE = 20;
+        const ASTEROID_SPEED_MAX = 1.2;
+        const BULLET_SPEED = 8;
+        const PLAYER_TURN_RATE = 0.08;
+        const PLAYER_THRUST = 0.15;
+        const PLAYER_FRICTION = 0.99;
+        const PLAYER_MAX_SPEED = 6;
+        const PLAYER_INVINCIBILITY_DURATION = 120;
 
         function preload() {
-            const heroFiles = ['Dave.png', 'Nadya.png'];
-            const faceFiles = ['Dave_face.png', 'Nadya_face.png'];
+            // Define the hero image files (original system)
+            const heroFiles = ['Dave.png', 'Nadya.png']; // Add more hero PNG files here
+            const faceFiles = ['Dave_face.png', 'Nadya_face.png']; // Face images for menus
 
             console.log('Preloading hero images...');
 
+            // Load all hero images dynamically
             for (let i = 0; i < heroFiles.length; i++) {
                 const heroPath = '../shared/sprites/' + heroFiles[i];
                 const facePath = '../shared/sprites/' + faceFiles[i];
@@ -268,10 +137,32 @@
                 console.log(`Loading hero ${i}: ${heroPath}`);
                 heroImages[i] = loadImage(heroPath);
                 heroFaceImages[i] = loadImage(facePath);
+                // Extract name from filename (remove .png extension)
                 heroNames[i] = heroFiles[i].replace('.png', '');
             }
 
             console.log(`Loaded ${heroImages.length} hero images`);
+        }
+
+        function getFaceRotation(heroIndex) {
+            // Animation cycle: 6.5 seconds total (0.5s animation + 2s offset + 4s pause)
+            let cycleDuration = 6.5 * 60; // Convert to frames (assuming 60fps)
+            let animationDuration = 0.5 * 60; // 0.5 seconds in frames
+
+            // Calculate offset: player 1 starts immediately, player 2 starts after 2 seconds
+            let startOffset = heroIndex * 2 * 60; // 2 seconds offset between players
+
+            // Calculate position in animation cycle
+            let time = (frameCount + startOffset) % cycleDuration;
+
+            if (time < animationDuration) {
+                // During animation: wiggle back and forth
+                let progress = time / animationDuration;
+                return sin(progress * TWO_PI * 2) * 0.3; // 2 full wiggles in 0.5 seconds
+            } else {
+                // During pause: no rotation
+                return 0;
+            }
         }
 
         function setup() {
@@ -280,19 +171,23 @@
             let canvas = createCanvas(windowWidth, windowHeight);
             canvas.parent(document.querySelector('.game-container'));
 
+            // Make canvas focusable and auto-focus for keyboard input
             canvas.elt.setAttribute('tabindex', '0');
-            canvas.elt.style.outline = 'none';
+            canvas.elt.style.outline = 'none'; // Remove focus outline
 
+            // Force focus after a short delay to ensure DOM is ready
             setTimeout(() => {
                 canvas.elt.focus();
                 console.log('Canvas focused');
             }, 100);
 
+            // Ensure canvas gets focus on any click or touch
             canvas.mousePressed(() => {
                 canvas.elt.focus();
-                return false;
+                return false; // Prevent default
             });
 
+            // Also focus on touch for mobile
             canvas.elt.addEventListener('touchstart', () => {
                 canvas.elt.focus();
             });
@@ -300,8 +195,11 @@
             colorMode(HSB, 360, 100, 100, 100);
             angleMode(RADIANS);
 
-            // Initialize Matrix Rain
+            // Initialize Matrix Rain directly using p5.js classes
             const SYMBOL_SIZE = 16;
+            const MIN_STREAM_LENGTH = 10;
+            const MAX_STREAM_LENGTH = 30;
+
             console.log('Initializing matrix rain...');
             let x = 0;
             for (let i = 0; x < width + SYMBOL_SIZE; i++) {
@@ -312,140 +210,25 @@
             }
             console.log(`Created ${matrixStreams.length} matrix streams`);
 
-            // Initialize Tetris game
-            resetFeatureEngineering();
+            // Initialize player
+            console.log('Initializing player...');
+            player = new Player();
+            console.log('Player created:', player);
+
+            // Spawn initial asteroids
+            console.log(`Spawning ${ASTEROID_INIT_NUM} asteroids...`);
+            spawnAsteroids(ASTEROID_INIT_NUM, ASTEROID_INIT_SIZE);
+            console.log(`Spawned ${asteroids.length} asteroids`);
+
             gameStartTime = millis();
 
             console.log('Feature Engineering game initialization complete');
-        }
-
-        function resetFeatureEngineering() {
-            console.log("resetFeatureEngineering() called");
-            
-            // Initialize the grid
-            grid = [];
-            for (let r = 0; r < ROWS; r++) {
-                grid[r] = [];
-                for (let c = 0; c < COLS; c++) {
-                    grid[r][c] = 0;
-                }
-            }
-
-            score = 0;
-            level = 1;
-            gameOver = false;
-            fallInterval = 1000;
-            lastFallTime = millis();
-            linesCleared = 0;
-
-            // Spawn pieces
-            currentPiece = spawnNewPiece();
-            nextPiece = spawnNewPiece();
-
-            // Initialize hero position
-            heroPositionX = (width - COLS * BLOCK_SIZE) / 2 + COLS * BLOCK_SIZE + UI_WIDTH / 2;
-            heroPositionY = height - 150;
-
-            console.log("Feature Engineering game reset complete");
-        }
-
-        function spawnNewPiece() {
-            const randomType = PIECE_TYPES[floor(random(PIECE_TYPES.length))];
-            return new Piece(randomType);
-        }
-
-        function isValidMove(piece, testX, testY, testShape) {
-            for (let r = 0; r < testShape.length; r++) {
-                for (let c = 0; c < testShape[r].length; c++) {
-                    if (testShape[r][c]) {
-                        const boardX = testX + c;
-                        const boardY = testY + r;
-
-                        if (boardX < 0 || boardX >= COLS || boardY >= ROWS) {
-                            return false;
-                        }
-                        if (boardY >= 0 && grid[boardY][boardX] !== 0) {
-                            return false;
-                        }
-                    }
-                }
-            }
-            return true;
-        }
-
-        function lockPiece() {
-            for (let r = 0; r < currentPiece.shape.length; r++) {
-                for (let c = 0; c < currentPiece.shape[r].length; c++) {
-                    if (currentPiece.shape[r][c]) {
-                        let gridX = currentPiece.x + c;
-                        let gridY = currentPiece.y + r;
-                        if (gridY >= 0 && gridY < ROWS && gridX >= 0 && gridX < COLS) {
-                            grid[gridY][gridX] = currentPiece.color;
-                        } else if (gridY < 0) {
-                            gameOver = true;
-                        }
-                    }
-                }
-            }
-        }
-
-        function handlePieceLocking() {
-            lockPiece();
-            if (gameOver) {
-                gameState = 'gameOver';
-                return;
-            }
-
-            clearLines();
-            currentPiece = nextPiece;
-            nextPiece = spawnNewPiece();
-
-            currentPiece.x = floor(COLS / 2) - floor(currentPiece.shape[0].length / 2);
-            currentPiece.y = 0;
-
-            if (!isValidMove(currentPiece, currentPiece.x, currentPiece.y, currentPiece.shape)) {
-                gameOver = true;
-                gameState = 'gameOver';
-            }
-            lastFallTime = millis();
-        }
-
-        function clearLines() {
-            let linesClearedThisTurn = 0;
-            for (let r = ROWS - 1; r >= 0; r--) {
-                let isFull = true;
-                for (let c = 0; c < COLS; c++) {
-                    if (grid[r][c] === 0) {
-                        isFull = false;
-                        break;
-                    }
-                }
-                if (isFull) {
-                    grid.splice(r, 1);
-                    grid.unshift(Array(COLS).fill(0));
-                    linesClearedThisTurn++;
-                    r++;
-                }
-            }
-            if (linesClearedThisTurn > 0) {
-                linesCleared += linesClearedThisTurn;
-                if (linesClearedThisTurn === 1) score += 100 * level;
-                else if (linesClearedThisTurn === 2) score += 300 * level;
-                else if (linesClearedThisTurn === 3) score += 500 * level;
-                else if (linesClearedThisTurn >= 4) score += 800 * level;
-
-                level = floor(linesCleared / 10) + 1;
-                fallInterval = max(100, 1000 - (level - 1) * 50);
-
-                // Check victory condition
-                if (linesCleared >= 30) {
-                    gameState = 'victory';
-                }
-            }
+            console.log('Hero images loaded:', heroImages.length);
+            console.log('Selected hero:', selectedHero);
         }
 
         function draw() {
-            background(220, 10, 10, 35);
+            background(220, 10, 10, 35); // Original dark blue-black background with trail effect
 
             if (gameState === 'playing') {
                 // Render matrix background during gameplay
@@ -454,242 +237,240 @@
                 }
                 updateGame();
             } else if (gameState === 'paused') {
+                console.log('Drawing pause menu');
                 displayPauseMenu();
             } else if (gameState === 'heroSwap') {
-                displayHeroSwap();
+                console.log('Drawing hero swap menu');
+                displayHeroSwap(); // This function renders its own matrix rain
             } else if (gameState === 'gameOver') {
+                console.log('Drawing game over screen');
                 displayGameOver();
             } else if (gameState === 'victory') {
-                displayVictory();
+                displayVictory(); // This function renders its own matrix rain
+            } else {
+                console.log('Unknown game state:', gameState);
             }
 
             updateUI();
+
+            // Debug info (extended for performance monitoring)
+            if (frameCount % 120 === 0) { // Every 2 seconds
+                console.log('=== PERFORMANCE DEBUG ===');
+                console.log('Game state:', gameState);
+                console.log('Asteroids:', asteroids.length);
+                console.log('Bullets:', bullets.length);
+                console.log('Fireworks:', fireworks.length);
+                console.log('SQL Particles:', sqlParticles.length);
+                console.log('Matrix Streams:', matrixStreams.length);
+                console.log('FPS estimate:', frameRate().toFixed(1));
+                console.log('========================');
+            }
         }
 
         function updateGame() {
-            if (gameOver) return;
+            if (gameOver || gameState === 'gameOver') return;
 
-            // Update tractor beam intensity
-            if (tractorBeamActive) {
-                tractorBeamIntensity = min(tractorBeamIntensity + 0.1, 1.0);
-            } else {
-                tractorBeamIntensity = max(tractorBeamIntensity - 0.1, 0.0);
-            }
+            // Update player
+            player.handleInput();
+            player.update();
+            player.edges();
+            player.render();
 
-            // Piece falling logic
-            if (millis() - lastFallTime > fallInterval) {
-                if (isValidMove(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
-                    currentPiece.y++;
-                    lastFallTime = millis();
-                } else {
-                    handlePieceLocking();
-                }
-            }
-
-            // Render game
-            renderFeatureEngineering();
-        }
-
-        function renderFeatureEngineering() {
-            // Center the game board
-            push();
-            const totalWidth = COLS * BLOCK_SIZE + UI_WIDTH;
-            const offsetX = (width - totalWidth) / 2;
-            translate(offsetX, 0);
-
-            drawGridAndStaticUI();
-
-            // Draw tractor beam effect
-            if (currentPiece && tractorBeamActive && tractorBeamIntensity > 0) {
-                drawTractorBeam();
-            }
-
-            // Draw current piece
-            if (currentPiece) {
-                currentPiece.draw(true);
-            }
-
-            // Draw hero character
-            drawHero();
-
-            drawScoreAndLevel();
-
-            pop();
-        }
-
-        function drawTractorBeam() {
-            if (!currentPiece) return;
-
-            // Calculate the bottom-right corner of the piece for beam target
-            let maxX = -Infinity;
-            let maxY = -Infinity;
-
-            for (let r = 0; r < currentPiece.shape.length; r++) {
-                for (let c = 0; c < currentPiece.shape[r].length; c++) {
-                    if (currentPiece.shape[r][c]) {
-                        let blockX = (currentPiece.x + c) * BLOCK_SIZE;
-                        let blockY = (currentPiece.y + r) * BLOCK_SIZE;
-                        maxX = max(maxX, blockX + BLOCK_SIZE);
-                        maxY = max(maxY, blockY + BLOCK_SIZE);
-                    }
-                }
-            }
-
-            let beamEndX = maxX - 10;
-            let beamEndY = maxY - 10;
-
-            // Calculate hero position (adjusted for centered board)
-            let heroX = COLS * BLOCK_SIZE + UI_WIDTH / 2;
-            let heroY = height - 150;
-
-            // Draw multiple beam lines for effect
-            for (let i = 0; i < 5; i++) {
-                let alpha = (tractorBeamIntensity * 40) * (1 - i * 0.15);
-                let beamWidth = 20 - i * 3;
-
-                stroke(180, 90, 90, alpha);
-                strokeWeight(beamWidth);
-                line(heroX, heroY, beamEndX, beamEndY);
-            }
-
-            // Beam particles
-            for (let i = 0; i < 8; i++) {
-                let t = (frameCount + i * 10) * 0.02;
-                let x = lerp(heroX, beamEndX, (sin(t) + 1) * 0.5);
-                let y = lerp(heroY, beamEndY, (sin(t) + 1) * 0.5);
-
-                let particleAlpha = tractorBeamIntensity * 60;
-                fill(180, 80, 100, particleAlpha);
-                noStroke();
-                circle(x + random(-15, 15), y + random(-15, 15), random(3, 8));
-            }
-        }
-
-        function drawHero() {
-            push();
-            let heroX = COLS * BLOCK_SIZE + UI_WIDTH / 2;
-            let heroY = height - 150;
-            translate(heroX, heroY);
-
-            // Draw the actual hero sprite if available
-            if (heroImages && heroImages[selectedHero]) {
-                imageMode(CENTER);
-                const heroScale = 1.0;
-
-                // Apply rotation when tractor beam is active
-                if (tractorBeamActive && currentPiece) {
-                    let maxX = -Infinity;
-                    let maxY = -Infinity;
-
-                    for (let r = 0; r < currentPiece.shape.length; r++) {
-                        for (let c = 0; c < currentPiece.shape[r].length; c++) {
-                            if (currentPiece.shape[r][c]) {
-                                let blockX = (currentPiece.x + c) * BLOCK_SIZE;
-                                let blockY = (currentPiece.y + r) * BLOCK_SIZE;
-                                maxX = max(maxX, blockX + BLOCK_SIZE);
-                                maxY = max(maxY, blockY + BLOCK_SIZE);
-                            }
+            // Handle continuous firing with spacebar
+            if (keyIsDown(32)) { // 32 = spacebar keycode
+                let currentTime = millis();
+                if (currentTime - lastFireTime >= (1000 / FIRE_RATE)) {
+                    // Check if there's already a Database Cleaner active
+                    let databaseCleanerActive = false;
+                    for (let bullet of bullets) {
+                        if (bullet instanceof DatabaseCleaner) {
+                            databaseCleanerActive = true;
+                            break;
                         }
                     }
-
-                    let targetX = maxX - 10;
-                    let targetY = maxY - 10;
-                    let angle = atan2(targetY - heroY, targetX - heroX);
-                    rotate(angle - PI/2);
-                }
-
-                image(heroImages[selectedHero], 0, 0,
-                      heroImages[selectedHero].width * heroScale,
-                      heroImages[selectedHero].height * heroScale);
-            } else {
-                // Fallback placeholder
-                fill(120, 90, 100);
-                noStroke();
-                ellipse(0, 0, 40, 50);
-
-                fill(180, 100, 100);
-                textAlign(CENTER, CENTER);
-                textSize(12);
-                text("HERO", 0, 0);
-            }
-
-            pop();
-        }
-
-        function drawGridAndStaticUI() {
-            // Draw grid background
-            for (let r = 0; r < ROWS; r++) {
-                for (let c = 0; c < COLS; c++) {
-                    if (grid[r][c] === 0) {
-                        noFill();
-                        stroke(0, 0, 20, 20);
-                        strokeWeight(1);
-                    } else {
-                        noFill();
-                        stroke(grid[r][c][0], grid[r][c][1], grid[r][c][2]);
-                        strokeWeight(2);
+                    
+                    // Only fire if no Database Cleaner is active
+                    if (!databaseCleanerActive) {
+                        player.shoot();
+                        lastFireTime = currentTime;
                     }
-                    rect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
                 }
             }
 
-            // Draw UI panel
-            const uiX = COLS * BLOCK_SIZE;
-            fill(240, 5, 20);
-            noStroke();
-            rect(uiX, 0, UI_WIDTH, height);
+            // Update bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].update();
+                bullets[i].render();
 
-            // Draw next piece preview
-            const previewBoxSize = BLOCK_SIZE * 4;
-            const previewAreaX = uiX + (UI_WIDTH - previewBoxSize) / 2;
-            const previewAreaY = BLOCK_SIZE * 1.5;
+                if (bullets[i].isOffscreen()) {
+                    // Check for DatabaseCleaner victory condition
+                    if (bullets[i] instanceof DatabaseCleaner && bullets[i].expanding) {
+                        console.log('DatabaseCleaner finished expanding - triggering victory!');
+                        // Clear all asteroids and trigger victory
+                        for (let asteroid of asteroids) {
+                            // Create particles for visual effect
+                            for (let j = 0; j < 5; j++) {
+                                let particleX = asteroid.pos.x + random(-20, 20);
+                                let particleY = asteroid.pos.y + random(-20, 20);
+                                fireworks.push(new Firework(particleX, particleY));
+                            }
+                            for (let j = 0; j < 2; j++) {
+                                sqlParticles.push(new SQLParticle(asteroid.pos.x, asteroid.pos.y));
+                            }
+                            score += floor(map(asteroid.r, ASTEROID_MIN_SIZE, ASTEROID_INIT_SIZE, 50, 10));
+                        }
+                        asteroids = [];
+                        gameState = 'victory';
+                        console.log('Victory state set! Asteroids cleared:', asteroids.length);
+                    }
+                    bullets.splice(i, 1);
+                }
+            }
 
-            fill(0, 0, 100);
-            textSize(18);
-            textAlign(CENTER, BOTTOM);
-            text("NEXT", previewAreaX + previewBoxSize / 2, previewAreaY - 5);
+            // Update SQL particles
+            for (let i = sqlParticles.length - 1; i >= 0; i--) {
+                sqlParticles[i].update();
+                sqlParticles[i].render();
+                if (sqlParticles[i].isDead()) {
+                    sqlParticles.splice(i, 1);
+                }
+            }
 
-            fill(240, 5, 10);
-            stroke(0, 0, 5, 30);
-            rect(previewAreaX, previewAreaY, previewBoxSize, previewBoxSize);
+            // Update asteroids
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                asteroids[i].update();
+                asteroids[i].edges();
+                asteroids[i].render();
 
-            if (nextPiece) {
-                let previewBlockDrawSize = BLOCK_SIZE * 0.75;
-                let shapePixelWidth = nextPiece.shape[0].length * previewBlockDrawSize;
-                let shapePixelHeight = nextPiece.shape.length * previewBlockDrawSize;
-                let pieceRenderX = previewAreaX + (previewBoxSize - shapePixelWidth) / 2;
-                let pieceRenderY = previewAreaY + (previewBoxSize - shapePixelHeight) / 2;
-                nextPiece.draw(false, pieceRenderX, pieceRenderY, previewBlockDrawSize);
+                // Check player collision
+                if (!player.isInvincible && player.hits(asteroids[i])) {
+                    playerHit();
+                }
+            }
+
+            // Check DatabaseCleaner expansion
+            let databaseCleanerExpanding = false;
+            for (let bullet of bullets) {
+                if (bullet instanceof DatabaseCleaner && bullet.expanding) {
+                    databaseCleanerExpanding = true;
+                    break;
+                }
+            }
+
+            // Bullet-asteroid collisions
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = asteroids.length - 1; j >= 0; j--) {
+                    if (bullets[i] && asteroids[j] && bullets[i].hits(asteroids[j])) {
+                        score += floor(map(asteroids[j].r, ASTEROID_MIN_SIZE, ASTEROID_INIT_SIZE, 50, 10));
+
+                        // Break up asteroids if not being destroyed by DatabaseCleaner
+                        if (asteroids[j].r > ASTEROID_MIN_SIZE * 1.6 && !databaseCleanerExpanding) {
+                            let newAsteroids = asteroids[j].breakup();
+                            asteroids.push(...newAsteroids);
+                        }
+
+                        asteroids.splice(j, 1);
+                        bullets.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            // Spawn powerup at score 500
+            if (score >= 500 && !powerupSpawned && !hasPowerup) {
+                powerup = new Powerup();
+                powerupSpawned = true;
+            }
+
+            // Update powerup
+            if (powerup) {
+                powerup.update();
+                powerup.render();
+
+                if (player.hits(powerup)) {
+                    hasPowerup = true;
+                    powerup = null;
+                    asteroidSpawnMultiplier = 2;
+
+                    // Show powerup indicator
+                    document.getElementById('powerup-indicator').style.display = 'block';
+                    document.getElementById('powerup-status').style.display = 'block';
+                }
+            }
+
+            // Spawn new asteroids if needed
+            if (asteroids.length === 0 && !gameOver && !databaseCleanerExpanding) {
+                let baseNum = ASTEROID_INIT_NUM + floor(score / 300);
+                let numToSpawn = baseNum * asteroidSpawnMultiplier;
+
+                // Cap the number to prevent performance issues
+                numToSpawn = min(numToSpawn, 20); // Max 20 asteroids
+
+                console.log(`Spawning asteroids: base=${baseNum}, multiplier=${asteroidSpawnMultiplier}, total=${numToSpawn}`);
+                spawnAsteroids(numToSpawn, ASTEROID_INIT_SIZE);
+            }
+
+            // Update fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update();
+                fireworks[i].render();
+                if (fireworks[i].isDead()) {
+                    fireworks.splice(i, 1);
+                }
             }
         }
 
-        function drawScoreAndLevel() {
-            const uiX = COLS * BLOCK_SIZE;
-            const scoreAreaX = uiX + UI_WIDTH / 2;
-            const scoreAreaY = BLOCK_SIZE * 7;
+        function spawnAsteroids(num, baseSize) {
+            for (let i = 0; i < num; i++) {
+                let x, y;
+                let attempts = 0;
+                do {
+                    x = random(width);
+                    y = random(height);
+                    attempts++;
+                    if (attempts > 100) break;
+                } while (dist(x, y, player.pos.x, player.pos.y) < baseSize * 2 + PLAYER_SIZE * 2);
+                asteroids.push(new Asteroid(createVector(x, y), baseSize));
+            }
+        }
 
-            fill(0, 0, 100);
-            textSize(18);
-            textAlign(CENTER, TOP);
-            text(`Level: ${level}`, scoreAreaX, scoreAreaY);
-            text(`Score: ${score}`, scoreAreaX, scoreAreaY + 25);
-            text(`Lines: ${linesCleared}`, scoreAreaX, scoreAreaY + 50);
+        function playerHit() {
+            lives--;
+            console.log(`Player hit! Lives remaining: ${lives}`);
+            
+            if (lives <= 0) {
+                console.log('Game over - no lives remaining!');
+                gameOver = true;
+                gameState = 'gameOver';
+            } else {
+                console.log('Player respawning...');
+                player.reset();
+            }
         }
 
         function updateUI() {
             document.getElementById('score').textContent = MLOpsUtils.formatScore(score);
-            document.getElementById('level').textContent = level;
+            document.getElementById('lives').textContent = lives;
             document.getElementById('current-hero').textContent = heroNames[selectedHero];
+
+            // Hide powerup indicator after a while
+            if (hasPowerup && document.getElementById('powerup-indicator').style.display === 'block') {
+                setTimeout(() => {
+                    document.getElementById('powerup-indicator').style.display = 'none';
+                }, 3000);
+            }
         }
 
         function displayPauseMenu() {
+            console.log('displayPauseMenu() called');
+
             // Semi-transparent overlay
             push();
             fill(0, 0, 0, 50);
             rect(0, 0, width, height);
             pop();
 
-            // Pause menu box
+            // Pause menu box (matching original styling)
             push();
             fill(220, 20, 20, 90);
             stroke(120, 100, 100);
@@ -709,6 +490,7 @@
             translate(width / 2, height / 2 - 50);
             rotate(getFaceRotation(selectedHero));
 
+            // Draw hero face if loaded
             if (heroFaceImages[selectedHero] && heroFaceImages[selectedHero].width > 0) {
                 imageMode(CENTER);
                 let faceScale = 0.6;
@@ -716,6 +498,7 @@
                       heroFaceImages[selectedHero].width * faceScale,
                       heroFaceImages[selectedHero].height * faceScale);
             } else {
+                // Fallback circle
                 fill(120, 100, 100);
                 noStroke();
                 circle(0, 0, 60);
@@ -726,19 +509,33 @@
             fill(120, 80, 90);
             text(`Playing as: ${heroNames[selectedHero]}`, width / 2, height / 2);
 
-            // Menu options
+            // Menu options (matching original)
             textSize(20);
             fill(120, 90, 100);
             text("[ENTER] Continue Playing", width / 2, height / 2 + 50);
             text("[H] Change Hero", width / 2, height / 2 + 80);
             text("[R] Restart Game", width / 2, height / 2 + 110);
             text("[M] Main Menu", width / 2, height / 2 + 140);
+
+            console.log('Pause menu rendered successfully');
         }
 
         function displayHeroSwap() {
+            console.log('displayHeroSwap() called');
+
             // Keep the game visible in background (frozen)
+            // Display all game elements but frozen
             for (let stream of matrixStreams) {
                 stream.render();
+            }
+            if (player) {
+                player.render();
+            }
+            for (let asteroid of asteroids) {
+                asteroid.render();
+            }
+            for (let bullet of bullets) {
+                bullet.render();
             }
 
             // Semi-transparent overlay
@@ -747,7 +544,7 @@
             rect(0, 0, width, height);
             pop();
 
-            // Hero selection box
+            // Hero selection box (matching original)
             push();
             fill(220, 20, 20, 90);
             stroke(120, 100, 100);
@@ -794,11 +591,12 @@
                 // Draw hero face if loaded
                 if (heroFaceImages[i] && heroFaceImages[i].width > 0) {
                     imageMode(CENTER);
-                    let faceScale = 0.6;
+                    let faceScale = 0.6; // Smaller scale for hero swap
                     image(heroFaceImages[i], 0, 0,
                           heroFaceImages[i].width * faceScale,
                           heroFaceImages[i].height * faceScale);
                 } else {
+                    // Fallback circle
                     fill(120, 100, 100);
                     noStroke();
                     circle(0, 0, 60);
@@ -816,22 +614,27 @@
             textSize(16);
             fill(120, 60, 70);
             text("Press number to select • ESC to cancel", width / 2, height / 2 + 150);
+
+            console.log('Hero swap menu rendered successfully');
         }
 
         function displayGameOver() {
+            console.log('displayGameOver() called');
+            
             // Semi-transparent overlay
             fill(0, 0, 0, 180);
             rect(0, 0, width, height);
 
+            // Use direct p5.js text rendering
             push();
-            fill(0, 100, 100);
+            fill(0, 100, 100); // Red for critical error
             textAlign(CENTER, CENTER);
             
             textSize(36);
-            text('FEATURE ENGINEERING FAILED', width/2, height/2 - 60);
+            text('DATA CORRUPTION CRITICAL', width/2, height/2 - 60);
             
             textSize(48);
-            fill(120, 100, 100);
+            fill(120, 100, 100); // Matrix green
             text('MISSION FAILED', width/2, height/2 - 20);
             
             textSize(24);
@@ -842,15 +645,17 @@
             fill(120, 60, 70);
             text('Press R to retry or ESC to return to hub', width/2, height/2 + 80);
             pop();
+            
+            console.log('Game over screen rendered successfully');
         }
 
         function displayVictory() {
-            // Matrix rain continues
+            // Matrix rain continues (like original)
             for (let stream of matrixStreams) {
                 stream.render();
             }
 
-            // Create fireworks
+            // Create fireworks (matching original)
             if (frameCount % 10 === 0) {
                 let x = random(width);
                 let y = random(height * 0.2, height * 0.5);
@@ -868,15 +673,15 @@
                 }
             }
 
-            // Victory text
+            // Victory text (matching original styling)
             fill(120, 100, 100);
             textSize(72);
             textAlign(CENTER, CENTER);
-            text("FEATURES FORGED!", width / 2, height / 2 - 100);
+            text("YOU WIN!", width / 2, height / 2 - 100);
 
             textSize(36);
             fill(180, 80, 90);
-            text("Data Engineered Successfully!", width / 2, height / 2 - 20);
+            text("Data Matrix Cleaned!", width / 2, height / 2 - 20);
 
             textSize(24);
             fill(120, 70, 80);
@@ -896,9 +701,8 @@
 
             if (gameState === 'playing') {
                 if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
+                    console.log('Pausing game');
                     gameState = 'paused';
-                } else {
-                    handleFeatureEngineeringInput();
                 }
             } else if (gameState === 'paused') {
                 if (keyCode === ENTER) {
@@ -912,12 +716,14 @@
                     returnToHub();
                 }
             } else if (gameState === 'heroSwap') {
+                // Handle hero selection (numbers 1-2 for Dave and Nadya)
                 let heroIndex = parseInt(key) - 1;
                 if (!isNaN(heroIndex) && heroIndex >= 0 && heroIndex < heroNames.length) {
                     selectedHero = heroIndex;
-                    gameState = 'playing';
+                    console.log(`Switched to hero: ${heroNames[selectedHero]}`);
+                    gameState = 'playing'; // Resume game with new hero
                 } else if (keyCode === ESCAPE) {
-                    gameState = 'paused';
+                    gameState = 'paused'; // Go back to pause menu
                 }
             } else if (gameState === 'gameOver') {
                 if (key === 'r' || key === 'R') {
@@ -927,83 +733,53 @@
                 }
             } else if (gameState === 'victory') {
                 if (key === 'r' || key === 'R') {
+                    console.log('Restarting game from victory screen');
                     resetGame();
                     gameState = 'playing';
                 } else if (keyCode === ESCAPE) {
+                    console.log('Returning to hub from victory screen');
                     returnToHub();
                 }
             }
         }
 
-        function handleFeatureEngineeringInput() {
-            if (gameOver || !currentPiece) return;
-
-            // Reset tractor beam for new input
-            tractorBeamActive = false;
-
-            if (keyCode === LEFT_ARROW) {
-                tractorBeamActive = true;
-                if (isValidMove(currentPiece, currentPiece.x - 1, currentPiece.y, currentPiece.shape)) {
-                    currentPiece.x--;
-                }
-            } else if (keyCode === RIGHT_ARROW) {
-                tractorBeamActive = true;
-                if (isValidMove(currentPiece, currentPiece.x + 1, currentPiece.y, currentPiece.shape)) {
-                    currentPiece.x++;
-                }
-            } else if (keyCode === DOWN_ARROW) {
-                tractorBeamActive = true;
-                if (isValidMove(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
-                    currentPiece.y++;
-                    score += 1 * level;
-                    lastFallTime = millis();
-                } else {
-                    handlePieceLocking();
-                }
-            } else if (keyCode === UP_ARROW) {
-                tractorBeamActive = true;
-                const rotatedShape = currentPiece.getRotatedShape();
-                if (isValidMove(currentPiece, currentPiece.x, currentPiece.y, rotatedShape)) {
-                    currentPiece.shape = rotatedShape;
-                    currentPiece.rotation = (currentPiece.rotation + 90) % 360;
-                } else {
-                    if (isValidMove(currentPiece, currentPiece.x + 1, currentPiece.y, rotatedShape)) {
-                        currentPiece.x++;
-                        currentPiece.shape = rotatedShape;
-                        currentPiece.rotation = (currentPiece.rotation + 90) % 360;
-                    } else if (isValidMove(currentPiece, currentPiece.x - 1, currentPiece.y, rotatedShape)) {
-                        currentPiece.x--;
-                        currentPiece.shape = rotatedShape;
-                        currentPiece.rotation = (currentPiece.rotation + 90) % 360;
-                    }
-                }
-            } else if (key === ' ') {
-                tractorBeamActive = true;
-                let cellsDropped = 0;
-                while (isValidMove(currentPiece, currentPiece.x, currentPiece.y + 1, currentPiece.shape)) {
-                    currentPiece.y++;
-                    cellsDropped++;
-                }
-                score += cellsDropped * 2 * level;
-                handlePieceLocking();
-            }
-        }
-
         function resetGame() {
             score = 0;
-            level = 1;
+            lives = 3;
             gameOver = false;
             gameState = 'playing';
+            asteroids = [];
+            bullets = [];
             fireworks = [];
-            tractorBeamActive = false;
-            tractorBeamIntensity = 0;
-            lastFallTime = 0;
+            sqlParticles = [];
+            powerup = null;
+            hasPowerup = false;
+            powerupSpawned = false;
+            asteroidSpawnMultiplier = 1;
+            lastFireTime = 0; // Reset firing timer
 
-            resetFeatureEngineering();
+            player.reset();
+            spawnAsteroids(ASTEROID_INIT_NUM, ASTEROID_INIT_SIZE);
+
+            document.getElementById('powerup-indicator').style.display = 'none';
+            document.getElementById('powerup-status').style.display = 'none';
+        }
+
+        function completeGame() {
+            const gameData = {
+                game: 'data-cleaning',
+                score: score,
+                completed: true,
+                timeSpent: millis() - gameStartTime,
+                message: 'Data matrix successfully cleaned! All corrupted data eliminated.'
+            };
+
+            MLOpsNavigation.returnToHub(gameData);
         }
 
         function returnToHub() {
             console.log('Returning to hub...');
+            // Simple redirect back to main page - no completion overlay
             window.location.href = '../index.html';
         }
 
@@ -1012,6 +788,9 @@
 
             // Regenerate matrix streams for new size
             const SYMBOL_SIZE = 16;
+            const MIN_STREAM_LENGTH = 10;
+            const MAX_STREAM_LENGTH = 30;
+
             matrixStreams = [];
             let x = 0;
             for (let i = 0; x < width + SYMBOL_SIZE; i++) {
