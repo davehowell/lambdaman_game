@@ -48,18 +48,16 @@ The `games/data-cleaning.html` structure is now the **proven template** for all 
 - Verified 60fps performance
 - Hub navigation working correctly
 
-#### 2. Model Monitoring → `games/model-monitoring.html` 🎯 **NEXT PRIORITY**
-**Base:** `to_be_integrated/missle_command_example.js` (562 lines, well-structured)
-**Theme:** Missile Command defending against data drift and anomalies
-
-**Port Strategy:**
-- Use data-cleaning template structure
-- Integrate missile command game logic
-- Replace "asteroids" with "incoming threats" (drift, anomalies)
-- Use "DATABASE CLEANER" equivalent for system-wide fixes
-- Update theme to monitoring metaphors
-
-**Expected Effort:** 6-8 hours (more complex integration)
+#### 2. Model Monitoring → `games/model-monitoring.html` ✅ **COMPLETE**
+**Status:** Successfully implemented and refined based on playtesting feedback
+**Completion Date:** 2025-07-14
+**Final Implementation:**
+- Single-level structure with Production Outage boss (30s-1min gameplay)
+- Proper ML model names: Neural Net, XGBoost, Random Forest
+- System Reset powerup with massive defense grid
+- Optimized text sizes for presentation readability
+- Clean theme without matrix rain for focused gameplay
+- Fast-paced timing perfect for demo presentations
 
 #### 3. Model Deployment → `games/model-deployment.html`
 **Base:** `to_be_integrated/model_deploy_pacman.html` (mostly complete)
@@ -277,10 +275,190 @@ The remaining work is primarily **mechanical porting** of existing game logic in
 
 **Next Action:** Begin with Model Monitoring game (Missile Command style), as it's the next priority in the workflow sequence. The Feature Engineering port has validated that the template approach works well for different game mechanics.
 
-## Progress Summary
-- **Completed:** 2/5 games (40%)
-- **Data Cleaning:** ✅ Asteroids-style - COMPLETE
-- **Feature Engineering:** ✅ Tetris-style - COMPLETE
-- **Model Monitoring:** 🎯 Missile Command - NEXT
-- **Model Deployment:** ⏳ Pac-Man - TODO
-- **Model Training:** ⏳ Space Invaders - TODO
+## Playtesting Feedback (2025-07-14)
+
+### Key Issues Identified & Fixed:
+1. **Text Size Problems** - All text was too small for presentation viewing
+   - **Solution:** Increased CSS font-sizes from 12px→24px, 18px→32px
+   - **Solution:** Increased p5.js textSize from 10-12→16-24 for all game elements
+
+2. **Model Display Issues** - Cities showed "SYS-1", "SYS-2", "SYS-3" instead of ML model names
+   - **Solution:** Replaced with proper ML model names: "Neural Net", "XGBoost", "Random Forest"
+   - **Solution:** Improved visual contrast with dark backgrounds and bright green text
+   - **Solution:** Increased model size from 80x30 to 120x50 pixels
+
+3. **Boss Logic Broken** - Game ended at wave 5 instead of spawning boss
+   - **Solution:** Converted to single-level structure with "Production Outage" boss
+   - **Solution:** Boss spawns after 15 seconds or 10 regular enemies (whichever comes first)
+   - **Solution:** Clear victory condition when boss is defeated
+
+4. **Missing System Reset Powerup** - Critical feature wasn't implemented
+   - **Solution:** Added pulsing powerup that spawns at 400 points
+   - **Solution:** Creates massive defense grid across entire screen when activated
+   - **Solution:** Perfect for defeating the Production Outage boss dramatically
+
+5. **Presentation Timing** - 2-3 minutes too long for presentation flow
+   - **Solution:** Optimized for 30s-1min gameplay duration
+   - **Solution:** Faster enemy spawn rates and progression
+   - **Solution:** Early powerup availability for quick climax
+
+### Design Validation:
+- **Matrix Rain Removal:** Confirmed clean gameplay area without busy background
+- **Green Glow Theme:** Perfect visual effect maintained throughout
+- **Presentation Focus:** Games now support MLOps concepts within tight timeframes
+
+## Playtesting Feedback Round 2 (2025-07-14) - CRITICAL FIXES NEEDED
+
+### 🚨 HIGH PRIORITY Issues:
+
+#### 1. **Powerup/Boss Timing Mismatch**
+- **Problem**: Boss spawns at ~150-175 points, but System Reset powerup spawns at 400 points
+- **Problem**: Regular missiles can damage boss (should be powerup-only)
+- **Solution**: Increase missile point values 4x to accelerate scoring
+- **Solution**: Sync powerup spawn with boss appearance (or immediately after)
+- **Solution**: Make regular missiles do ZERO damage to boss
+- **Goal**: Force strategic System Reset usage for dramatic boss defeat
+
+#### 2. **Powerup Collection UX Unclear**
+- **Problem**: User unclear how to collect the pulsing System Reset powerup
+- **Investigation**: Determine if it's mouse hover, click, or automatic collection
+- **Solution**: Add clear visual feedback and/or instructions
+- **Goal**: Intuitive powerup interaction
+
+#### 3. **Boss Victory Logic Broken**
+- **Problem**: Boss hitting one model → "OFFLINE" → game enters limbo state
+- **Problem**: No proper failure condition for "Production Outage"
+- **Solution**: Boss should destroy ALL 3 models in sequence for total system failure
+- **Solution**: Immediate game over when all models destroyed
+- **Goal**: Proper "Production Outage" represents complete ML infrastructure failure
+
+### 🔧 MEDIUM PRIORITY Issues:
+
+#### 4. **UI Layout Collision**
+- **Problem**: Bottom left help text overlaps model bases in narrow browser windows
+- **Solution**: Move model bases higher up screen to avoid text overlap
+- **Solution**: Ensure responsive layout works at various browser widths
+- **Goal**: Clean presentation at all screen sizes
+
+### 🎨 LOW PRIORITY Issues:
+
+#### 5. **Enemy Visual Enhancement**
+- **Problem**: Red circle enemies need more thematic "pizzazz"
+- **Feedback**: Red color is good, but needs ML monitoring theme effects
+- **Solution**: Make enemies glowy/hollow circles with visual effects
+- **Goal**: More engaging threat visualization while maintaining readability
+
+### Next Session Implementation Order:
+1. **Fix powerup/boss synchronization** (critical for game mechanics)
+2. **Investigate and fix powerup collection UX** (user confusion)  
+3. **Implement boss total destruction logic** (proper failure state)
+4. **Adjust model positioning for responsive layout** (presentation quality)
+5. **Enhance enemy visual effects** (polish)
+
+### Specific Code Changes Needed:
+- Increase enemy point values 4x in enemy definitions
+- Change powerup spawn condition from score-based to boss-appearance-based
+- Add boss immunity to regular missiles (only System Reset damages boss)
+- Clarify powerup collection mechanism (currently mouse distance-based)
+- Implement boss sequential model destruction instead of single-model hit
+- Move model base Y positions higher to avoid UI text overlap
+- Add glow/hollow effects to enemy circle rendering
+
+### Current Status:
+**Model Monitoring Game**: Feature-complete but needs critical bug fixes from playtesting
+**Game Length**: Perfect at 30s-1min 
+**Theme**: Excellent - just needs mechanical refinements
+**Visual Polish**: Good foundation, needs enemy enhancement and layout fixes
+
+## Progress Summary (2025-07-17)
+### ✅ MAJOR RESTRUCTURING COMPLETE
+- **Simplified to 4-game structure** (removed janky Tetris game)
+- **Renamed Data Cleaning → Feature Engineering** (keeping Asteroids gameplay)
+- **Games Completed:** 3/4 (75%)
+  - **Feature Engineering:** ✅ Asteroids-style - COMPLETE (renamed from Data Cleaning)
+  - **Model Training:** ⏳ Space Invaders - TODO
+  - **Model Deployment:** ⏳ Pac-Man - TODO
+  - **Model Monitoring:** ✅ Missile Command - COMPLETE (all bugs fixed)
+
+### 🎯 CURRENT FOCUS: Landing Page Pipeline Visualization
+
+## Landing Page Pipeline Visualization Plan (2025-07-17)
+
+### Overview
+Transform the landing page from a simple grid layout to an engaging pipeline visualization that represents the MLOps workflow as a flowing data pipeline.
+
+### Visual Design
+- **S-shaped pipeline** connecting all 4 games
+- **Green neon pipe outline** (maintains Matrix theme)
+- **Colorful game tiles** with distinct neon colors:
+  - Feature Engineering: **Purple** (#9D4EDD)
+  - Model Training: **Blue** (#0096C7)
+  - Model Deployment: **Pink** (#FF006E)
+  - Model Monitoring: **Orange** (#FB5607)
+
+### Implementation Steps
+
+#### 1. Restructure Layout (index.html)
+- Change from grid to absolute positioning
+- Create container for pipeline visualization
+- Position tiles along S-curve path:
+  - Bottom-left: Feature Engineering (start)
+  - Bottom-right: Model Training
+  - Top-left: Model Deployment
+  - Top-right: Model Monitoring (end)
+
+#### 2. Create SVG Pipeline
+- Design S-shaped path using cubic bezier curves
+- Apply green neon effect:
+  - Stroke: bright green (#00ff41)
+  - Multiple box-shadows for glow effect
+  - Semi-transparent fill
+- Position behind game tiles with proper z-index
+
+#### 3. Colorize Game Tiles
+- Update each tile with unique neon color
+- Maintain consistent neon glow effects
+- Update hover states to match new colors
+- Keep completed checkmarks visible
+
+#### 4. Add Flow Animation (Optional Enhancement)
+- Subtle pulse effect along pipeline
+- Moving particles or dots through pipe
+- Reinforces data flow concept
+- Use CSS animations for performance
+
+### Technical Considerations
+- Maintain responsive design for different screen sizes
+- Ensure accessibility with proper contrast
+- Keep Matrix rain background visible but subtle
+- Optimize performance with CSS transforms
+
+### Expected Outcome
+- Clear visual metaphor for MLOps pipeline
+- Engaging presentation that draws the eye through the workflow
+- Professional yet playful aesthetic
+- Intuitive progression from data processing to model monitoring
+
+## Remaining Work After Pipeline Visualization
+
+### Phase 1: Complete Remaining Games
+1. **Model Training (Space Invaders)**
+   - Port from `to_be_integrated/mt_me_space_invaders.html`
+   - Theme: Training batches as invader waves
+   - Add hyperparameter tuning mechanics
+   - Estimated: 8-10 hours
+
+2. **Model Deployment (Pac-Man)**
+   - Port from `to_be_integrated/model_deploy_pacman.html`
+   - Theme: Navigate deployment maze
+   - Collect artifacts, avoid deployment ghosts
+   - Estimated: 4-6 hours
+
+### Phase 2: Final Polish
+- Sound effects integration
+- Performance optimization
+- Cross-browser testing
+- Documentation updates
+
+## Current Session Focus
+**Priority:** Implement landing page pipeline visualization before continuing with remaining games. This will create a more engaging entry point for the presentation and better communicate the MLOps workflow concept.
