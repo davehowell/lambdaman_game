@@ -9,7 +9,8 @@ const workflowPhases = [
         description: 'Fight corrupted data in the matrix. Use SQL commands to eliminate bad data and engineer clean features.',
         gameFile: 'games/feature-engineering.html',
         completed: false,
-        score: 0
+        score: 0,
+        color: '#9D4EDD'
     },
     {
         id: 'model-training',
@@ -18,7 +19,8 @@ const workflowPhases = [
         description: 'Train neural networks by defeating waves of training data. Optimize for accuracy.',
         gameFile: 'games/model-training.html',
         completed: false,
-        score: 0
+        score: 0,
+        color: '#0096C7'
     },
     {
         id: 'model-deployment',
@@ -27,7 +29,8 @@ const workflowPhases = [
         description: 'Navigate the deployment maze. Collect artifacts while avoiding deployment ghosts.',
         gameFile: 'games/model-deployment.html',
         completed: false,
-        score: 0
+        score: 0,
+        color: '#FF006E'
     },
     {
         id: 'model-monitoring',
@@ -36,7 +39,8 @@ const workflowPhases = [
         description: 'Defend your ML systems from anomaly missiles. Keep the models healthy.',
         gameFile: 'games/model-monitoring.html',
         completed: false,
-        score: 0
+        score: 0,
+        color: '#FB5607'
     }
 ];
 
@@ -56,15 +60,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function renderWorkflowPipeline() {
     const pipeline = document.getElementById('workflow-pipeline');
-    pipeline.innerHTML = '';
+    // Clear only the game tiles, keep the SVG
+    const existingTiles = pipeline.querySelectorAll('.workflow-phase');
+    existingTiles.forEach(tile => tile.remove());
     
     workflowPhases.forEach((phase, index) => {
         const phaseElement = document.createElement('div');
-        phaseElement.className = `workflow-phase ${phase.completed ? 'completed' : ''}`;
+        phaseElement.className = `workflow-phase phase-${phase.id} ${phase.completed ? 'completed' : ''}`;
         phaseElement.onclick = () => launchGame(phase.id);
         
+        // Apply phase-specific color styling
+        phaseElement.style.borderColor = phase.color;
+        phaseElement.style.background = `rgba(${hexToRgb(phase.color)}, 0.1)`;
+        phaseElement.style.boxShadow = `0 0 20px rgba(${hexToRgb(phase.color)}, 0.3)`;
+        
         phaseElement.innerHTML = `
-            <div class="phase-title">${phase.title}</div>
+            <div class="phase-title" style="color: ${phase.color};">${phase.title}</div>
             <div class="phase-subtitle">${phase.subtitle}</div>
             <div class="phase-description">${phase.description}</div>
             ${phase.completed ? `<div class="phase-score">Best Score: ${MLOpsUtils.formatScore(phase.score)}</div>` : ''}
@@ -72,6 +83,13 @@ function renderWorkflowPipeline() {
         
         pipeline.appendChild(phaseElement);
     });
+}
+
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? 
+        `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : 
+        '0, 255, 65';
 }
 
 function renderHeroGallery() {
