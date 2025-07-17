@@ -29,12 +29,12 @@
         }
 
         .status-label {
-            font-size: 12px;
+            font-size: 24px;
             color: var(--matrix-green-medium);
         }
 
         .status-value {
-            font-size: 18px;
+            font-size: 32px;
             font-weight: bold;
         }
 
@@ -63,7 +63,7 @@
             left: 20px;
             color: var(--matrix-green-dark);
             font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 20px;
             line-height: 1.4;
         }
 
@@ -160,50 +160,54 @@
         let enemies = [];
         let missiles = [];
         let explosions = [];
-        let matrixStreams = [];
+        let fireworks = [];
 
         // Game constants
         const NUM_BASES = 3;
-        const BASE_WIDTH = 80;
-        const BASE_HEIGHT = 30;
+        const BASE_WIDTH = 120;
+        const BASE_HEIGHT = 50;
         const MISSILE_SPEED = 8;
         const EXPLOSION_RADIUS_MAX = 80;
         const EXPLOSION_DURATION = 40;
 
-        // Enemy definitions (ML monitoring threats)
+        // Enemy definitions (ML monitoring threats) - 4x points for faster scoring
         const ENEMY_DEFINITIONS = [
-            { name: "Data Drift", speed: 0.8, points: 10, color: [60, 180, 255], size: 25 },
-            { name: "Model Decay", speed: 1.0, points: 15, color: [100, 150, 250], size: 28 },
-            { name: "Anomaly Spike", speed: 1.2, points: 20, color: [255, 200, 80], size: 22 },
-            { name: "Performance Drop", speed: 0.6, points: 25, color: [230, 80, 80], size: 35 }
+            { name: "Data Drift", speed: 0.8, points: 40, color: [60, 180, 255], size: 50 },
+            { name: "Model Decay", speed: 1.0, points: 60, color: [100, 150, 250], size: 56 },
+            { name: "Anomaly Spike", speed: 1.2, points: 80, color: [255, 200, 80], size: 44 },
+            { name: "Performance Drop", speed: 0.6, points: 100, color: [230, 80, 80], size: 70 }
         ];
 
         const BOSS_DEFINITION = {
-            name: "System Failure",
+            name: "Production Outage",
             speed: 0.4,
-            points: 200,
-            color: [255, 50, 50],
-            size: 80,
-            health: 8
+            points: 500,
+            color: [0, 100, 50],
+            size: 100,
+            health: 10
         };
 
-        // Wave management
+        // Single level management
         let enemySpawnTimer = 0;
-        let enemySpawnInterval = 2000;
-        let enemiesThisWave = 5;
-        let enemiesSpawnedThisWave = 0;
+        let enemySpawnInterval = 1500; // Faster initial spawn rate for presentation
+        let regularEnemiesSpawned = 0;
+        let maxRegularEnemies = 10; // Spawn 10 regular threats before boss (faster progression)
         let isBossActive = false;
         let bossDefeatedThisGame = false;
+        let bossSpawnTime = 15000; // Boss spawns after 15 seconds (faster for presentation)
+
+        // System Reset powerup
+        let powerup = null;
+        let hasPowerup = false;
+        let powerupSpawned = false;
+        let powerupSpawnedWithBoss = false; // Track if powerup spawned with boss
+        let systemResetDeployment = null; // Active deployment manager
 
         function setup() {
             let canvas = createCanvas(windowWidth, windowHeight);
             canvas.parent(document.querySelector('.game-container'));
 
             colorMode(HSB, 360, 100, 100, 100);
-
-            // Initialize matrix background (original implementation)
-            const matrixRain = MLOpsUtils.createMatrixRain(16, 10, 30);
-            matrixStreams = matrixRain.streams;
 
             // Initialize bases (ML systems to defend)
             initializeBases();
@@ -215,11 +219,6 @@
 
         function draw() {
             background(220, 10, 10, 35); // Original background
-
-            // Render matrix background
-            for (let stream of matrixStreams) {
-                stream.render();
-            }
 
             if (gameState === 'playing') {
                 updateGame();
@@ -243,7 +242,7 @@
 
             for (let i = 0; i < NUM_BASES; i++) {
                 const x = baseSpacing * (i + 1);
-                const y = height - 60;
+                const y = height - 120; // Moved higher to avoid UI text overlap
                 bases.push(new Base(x, y, i));
             }
         }
@@ -251,11 +250,29 @@
         function updateGame() {
             if (gameOver) return;
 
-            // Spawn enemies
-            if (millis() - enemySpawnTimer > enemySpawnInterval && enemiesSpawnedThisWave < enemiesThisWave) {
+            // Spawn regular enemies
+            if (millis() - enemySpawnTimer > enemySpawnInterval &&
+                regularEnemiesSpawned < maxRegularEnemies &&
+                !isBossActive) {
                 spawnEnemy();
                 enemySpawnTimer = millis();
-                enemiesSpawnedThisWave++;
+                regularEnemiesSpawned++;
+
+                // Gradually increase spawn rate for fast presentation gameplay
+                enemySpawnInterval = Math.max(600, 1500 - (regularEnemiesSpawned * 100));
+            }
+
+            // Spawn boss after time limit or when regular enemies are done
+            if ((millis() - gameStartTime > bossSpawnTime || regularEnemiesSpawned >= maxRegularEnemies) &&
+                !isBossActive && !bossDefeatedThisGame && enemies.length === 0) {
+                spawnBoss();
+                isBossActive = true;
+
+                // Spawn powerup immediately when boss appears
+                if (!powerupSpawnedWithBoss && !hasPowerup && !powerup) {
+                    powerup = new SystemResetPowerup();
+                    powerupSpawnedWithBoss = true;
+                }
             }
 
             // Update enemies
@@ -270,6 +287,18 @@
                     if (targetBase && !targetBase.isDestroyed) {
                         targetBase.destroy();
                         explosions.push(new Explosion(targetBase.x, targetBase.y, EXPLOSION_RADIUS_MAX));
+
+                        // If this was the boss, check if all models are destroyed
+                        if (enemies[i].name === "Production Outage") {
+                            // Boss continues to next target until all models destroyed
+                            let remainingModels = bases.filter(base => !base.isDestroyed);
+                            if (remainingModels.length > 0) {
+                                // Boss targets next available model and recalculates trajectory
+                                enemies[i].retarget(remainingModels[0]);
+                                // Don't remove boss, let it continue
+                                continue;
+                            }
+                        }
                     }
                     enemies.splice(i, 1);
                     continue;
@@ -302,8 +331,20 @@
                 // Check explosion-enemy collisions
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     if (explosions[i].hits(enemies[j])) {
-                        score += enemies[j].points;
-                        enemies.splice(j, 1);
+                        // Check if this is the boss - only System Reset can damage it
+                        if (enemies[j].name === "Production Outage") {
+                            // Boss can only be damaged by System Reset powerup explosions
+                            if (explosions[i].isSystemReset) {
+                                score += enemies[j].points;
+                                bossDefeatedThisGame = true;
+                                enemies.splice(j, 1);
+                            }
+                            // Regular missiles have no effect on boss
+                        } else {
+                            // Regular enemies take damage from any explosion
+                            score += enemies[j].points;
+                            enemies.splice(j, 1);
+                        }
                     }
                 }
 
@@ -317,13 +358,46 @@
                 base.render();
             }
 
-            // Check wave completion
-            if (enemiesSpawnedThisWave >= enemiesThisWave && enemies.length === 0) {
-                if (wave >= 5 && !bossDefeatedThisGame) {
-                    // Victory condition
-                    gameState = 'victory';
-                } else {
-                    gameState = 'waveCleared';
+            // Powerup now spawns with boss appearance (handled above)
+            // Legacy score-based spawning removed
+
+            // Update powerup
+            if (powerup) {
+                powerup.update();
+                powerup.render();
+
+                // Check collision with missiles (shoot to collect)
+                for (let i = missiles.length - 1; i >= 0; i--) {
+                    if (dist(missiles[i].x, missiles[i].y, powerup.pos.x, powerup.pos.y) < powerup.r + 10) {
+                        hasPowerup = true;
+                        powerup = null;
+                        missiles.splice(i, 1); // Remove the missile that hit it
+                        break;
+                    }
+                }
+            }
+
+            // Check victory condition
+            if (bossDefeatedThisGame && enemies.length === 0) {
+                gameState = 'victory';
+            }
+
+            // Update fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update();
+                fireworks[i].render();
+                if (fireworks[i].isDead()) {
+                    fireworks.splice(i, 1);
+                }
+            }
+
+            // Update System Reset deployment if active
+            if (systemResetDeployment && systemResetDeployment.isActive) {
+                systemResetDeployment.update();
+
+                // Clean up deployment when complete
+                if (systemResetDeployment.isComplete()) {
+                    systemResetDeployment = null;
                 }
             }
 
@@ -340,6 +414,12 @@
             const targetBase = bases[Math.floor(Math.random() * bases.length)];
 
             enemies.push(new Enemy(startX, -50, targetBase, enemyType));
+        }
+
+        function spawnBoss() {
+            const startX = width / 2; // Boss spawns in center
+            const targetBase = bases.find(base => !base.isDestroyed) || bases[0]; // Target first alive base
+            enemies.push(new Enemy(startX, -100, targetBase, BOSS_DEFINITION));
         }
 
         function updateCrosshair() {
@@ -383,13 +463,44 @@
         }
 
         function displayVictory() {
-            fill(0, 0, 0, 60);
-            rect(0, 0, width, height);
+            // Create fireworks continuously like data cleaning game
+            if (frameCount % 10 === 0) {
+                let x = random(width);
+                let y = random(height * 0.2, height * 0.5);
+                for (let i = 0; i < 50; i++) {
+                    fireworks.push(new Firework(x, y));
+                }
+            }
 
-            MLOpsUtils.drawGlowText(drawingContext, 'SYSTEMS SECURED!', width/2, height/2 - 60, 48);
-            MLOpsUtils.drawGlowText(drawingContext, 'MONITORING COMPLETE', width/2, height/2 - 20, 36);
-            MLOpsUtils.drawGlowText(drawingContext, `Score: ${MLOpsUtils.formatScore(score)}`, width/2, height/2 + 40, 24);
-            MLOpsUtils.drawGlowText(drawingContext, 'Press SPACE to complete workflow', width/2, height/2 + 80, 18);
+            // Update and render fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update();
+                fireworks[i].render();
+                if (fireworks[i].isDead()) {
+                    fireworks.splice(i, 1);
+                }
+            }
+
+            // Victory text matching data cleaning style
+            fill(120, 100, 100);
+            textSize(72);
+            textAlign(CENTER, CENTER);
+            text("YOU WIN!", width / 2, height / 2 - 100);
+
+            textSize(36);
+            fill(180, 80, 90);
+            text("ML Systems Secured!", width / 2, height / 2 - 20);
+
+            textSize(24);
+            fill(120, 70, 80);
+            text(`Final Score: ${score}`, width / 2, height / 2 + 40);
+
+            textSize(20);
+            fill(120, 60, 70);
+            text("Press R to play again", width / 2, height / 2 + 140);
+
+            textSize(16);
+            text("Press ESC to return to hub", width / 2, height / 2 + 170);
         }
 
         function displayWaveCleared() {
@@ -403,12 +514,25 @@
 
         function mousePressed() {
             if (gameState === 'playing') {
-                // Launch defensive missile
-                const nearestBase = findNearestBase(mouseX, mouseY);
-                if (nearestBase && !nearestBase.isDestroyed) {
-                    missiles.push(new Missile(nearestBase.x, nearestBase.y, mouseX, mouseY));
+                if (hasPowerup) {
+                    // Deploy System Reset - massive defense grid
+                    deploySystemReset();
+                    hasPowerup = false;
+                    // Victory will be triggered by the deployment manager
+                } else {
+                    // Launch defensive missile
+                    const nearestBase = findNearestBase(mouseX, mouseY);
+                    if (nearestBase && !nearestBase.isDestroyed) {
+                        missiles.push(new Missile(nearestBase.x, nearestBase.y, mouseX, mouseY));
+                    }
                 }
             }
+        }
+
+        function deploySystemReset() {
+            // Create deployment manager to handle the entire 8-second sequence
+            systemResetDeployment = new SystemResetDeployment();
+            console.log('System Reset deployment initiated - 8-second sequence started');
         }
 
         function findNearestBase(x, y) {
@@ -446,8 +570,11 @@
                     returnToHub();
                 }
             } else if (gameState === 'victory') {
-                if (key === ' ' || keyCode === ENTER) {
-                    completeGame();
+                if (key === 'r' || key === 'R') {
+                    resetGame();
+                    gameState = 'playing';
+                } else if (keyCode === ESCAPE) {
+                    returnToHub();
                 }
             } else if (gameState === 'waveCleared') {
                 if (key === ' ' || keyCode === ENTER) {
@@ -472,46 +599,256 @@
             enemies = [];
             missiles = [];
             explosions = [];
-            enemiesThisWave = 5;
-            enemiesSpawnedThisWave = 0;
-            enemySpawnInterval = 2000;
+            fireworks = [];
+            regularEnemiesSpawned = 0;
+            enemySpawnInterval = 1500;
             isBossActive = false;
             bossDefeatedThisGame = false;
+            powerup = null;
+            hasPowerup = false;
+            powerupSpawned = false;
+            powerupSpawnedWithBoss = false;
+            systemResetDeployment = null; // Reset deployment manager
+            gameStartTime = millis();
 
             initializeBases();
         }
 
-        function completeGame() {
-            const gameData = {
-                game: 'model-monitoring',
-                score: score,
-                completed: true,
-                timeSpent: millis() - gameStartTime,
-                message: 'ML systems successfully defended! All anomalies neutralized.'
-            };
+        // Firework class for victory celebrations
+        class Firework {
+            constructor(x, y) {
+                this.pos = createVector(x, y);
+                this.vel = p5.Vector.random2D().mult(random(2, 10));
+                this.acc = createVector(0, 0);
+                this.lifespan = 255;
+                this.hue = random(80, 180);
+            }
 
-            MLOpsNavigation.returnToHub(gameData);
+            update() {
+                this.vel.add(this.acc);
+                this.pos.add(this.vel);
+                this.acc.mult(0);
+                this.lifespan -= 4;
+                this.vel.mult(0.95);
+            }
+
+            render() {
+                push();
+                stroke(this.hue, 80, 100, this.lifespan);
+                strokeWeight(3);
+                point(this.pos.x, this.pos.y);
+                pop();
+            }
+
+            isDead() {
+                return this.lifespan < 0;
+            }
+        }
+
+        // System Reset Deployment Manager
+        class SystemResetDeployment {
+            constructor() {
+                this.startTime = millis();
+                this.duration = 8000; // 8 seconds total effect
+                this.isActive = true;
+                this.explosionSchedule = [];
+                this.flashSchedule = [];
+                this.spawnedExplosions = new Set();
+                this.spawnedFlashes = new Set();
+                this.hasTriggeredVictory = false;
+                
+                // Configurable phase duration ratios (proportional to total duration)
+                this.explosionPhaseRatio = 0.625; // 5/8 of total (explosions spawn over first 62.5%)
+                this.flashStartRatio = 0.125; // 1/8 of total (flashes start at 12.5%)
+                this.flashEndRatio = 0.8; // 4/5 of total (flashes end at 80%)
+                this.victoryRatio = 1.0; // Victory triggers at 100% of total duration
+
+                this.generateSpawnSchedule();
+            }
+
+            generateSpawnSchedule() {
+                // Generate grid explosion schedule (proportional to explosion phase)
+                let explosionId = 0;
+                let explosionPhaseDuration = this.duration * this.explosionPhaseRatio;
+                for (let x = 100; x < width - 100; x += 120) {
+                    for (let y = 50; y < height - 150; y += 120) {
+                        this.explosionSchedule.push({
+                            id: explosionId++,
+                            x: x + random(-30, 30),
+                            y: y + random(-30, 30),
+                            spawnTime: random(0, explosionPhaseDuration), // Spread over explosion phase
+                            duration: this.duration * 0.375 // Each explosion lasts 37.5% of total duration (3/8)
+                        });
+                    }
+                }
+
+                // Generate flash schedule (proportional timing)
+                let flashStart = this.duration * this.flashStartRatio;
+                let flashEnd = this.duration * this.flashEndRatio;
+                let flashPhaseDuration = flashEnd - flashStart;
+                let numFlashes = 10;
+                
+                for (let i = 0; i < numFlashes; i++) {
+                    this.flashSchedule.push({
+                        id: i,
+                        spawnTime: flashStart + (i * flashPhaseDuration / numFlashes), // Evenly distributed over flash phase
+                        duration: this.duration * 0.25 // Each flash lasts 25% of total duration (2/8)
+                    });
+                }
+            }
+
+            update() {
+                if (!this.isActive) return;
+
+                let elapsed = millis() - this.startTime;
+
+                // Spawn grid explosions
+                for (let explosion of this.explosionSchedule) {
+                    if (!this.spawnedExplosions.has(explosion.id) && elapsed >= explosion.spawnTime) {
+                        let systemResetExplosion = new Explosion(explosion.x, explosion.y, EXPLOSION_RADIUS_MAX * 2);
+                        systemResetExplosion.isSystemReset = true;
+                        systemResetExplosion.startTime = millis();
+                        systemResetExplosion.duration = explosion.duration;
+                        explosions.push(systemResetExplosion);
+                        this.spawnedExplosions.add(explosion.id);
+                    }
+                }
+
+                // Spawn screen flashes
+                for (let flash of this.flashSchedule) {
+                    if (!this.spawnedFlashes.has(flash.id) && elapsed >= flash.spawnTime) {
+                        let flashExplosion = new Explosion(width/2, height/2, width);
+                        flashExplosion.isSystemReset = true;
+                        flashExplosion.startTime = millis();
+                        flashExplosion.duration = flash.duration;
+                        explosions.push(flashExplosion);
+                        this.spawnedFlashes.add(flash.id);
+                    }
+                }
+
+                // Trigger victory at proportional time (75% of total duration)
+                if (!this.hasTriggeredVictory && elapsed >= this.duration * this.victoryRatio) {
+                    this.triggerVictory();
+                    this.hasTriggeredVictory = true;
+                }
+
+                // Check if deployment is complete
+                if (elapsed >= this.duration) {
+                    this.isActive = false;
+                }
+            }
+
+            triggerVictory() {
+                // Clear all enemies and trigger victory
+                for (let enemy of enemies) {
+                    // Create particles for visual effect
+                    for (let j = 0; j < 5; j++) {
+                        let particleX = enemy.x + random(-20, 20);
+                        let particleY = enemy.y + random(-20, 20);
+                        fireworks.push(new Firework(particleX, particleY));
+                    }
+                    score += enemy.points;
+                }
+                enemies = [];
+                bossDefeatedThisGame = true;
+                gameState = 'victory';
+                console.log('Victory state set! System Reset deployment complete');
+            }
+
+            isComplete() {
+                return !this.isActive;
+            }
+        }
+
+        function completeGame() {
+            console.log('Returning to hub...');
+            // Simple redirect back to main page - no completion overlay
+            window.location.href = '../index.html';
         }
 
         function returnToHub() {
-            const gameData = {
-                game: 'model-monitoring',
-                score: score,
-                completed: gameState === 'victory',
-                timeSpent: millis() - gameStartTime
-            };
-
-            MLOpsNavigation.returnToHub(gameData);
+            console.log('Returning to hub...');
+            // Simple redirect back to main page - no completion overlay
+            window.location.href = '../index.html';
         }
 
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
-
-            // Regenerate matrix streams for new size
-            const matrixRain = MLOpsUtils.createMatrixRain(16, 10, 30);
-            matrixStreams = matrixRain.streams;
-
             initializeBases();
+        }
+
+        // System Reset Powerup class (based on data cleaning powerup)
+        class SystemResetPowerup {
+            constructor() {
+                this.pos = createVector(random(width * 0.2, width * 0.8), random(height * 0.2, height * 0.6));
+                this.r = 30;
+                this.angle = 0;
+                this.floatOffset = 0;
+            }
+
+            update() {
+                this.angle += 0.02;
+                this.floatOffset = sin(frameCount * 0.05) * 10;
+            }
+
+            render() {
+                push();
+                translate(this.pos.x, this.pos.y + this.floatOffset);
+                rotate(this.angle);
+
+                // Draw Gemini-style concave diamond
+                noFill();
+                strokeWeight(3);
+                // Animated gradient effect
+                let hue = (frameCount * 2) % 360;
+                stroke(hue, 100, 100);
+
+                // Concave diamond shape using quadratic curves
+                let s = this.r; // Half size for easier calculations
+                let valleyDepthFactor = 0.8; // How concave the shape is (0 = diamond, 1 = very pinched)
+
+                // Outer Tips
+                let tipTop = { x: 0, y: -s };
+                let tipRight = { x: s, y: 0 };
+                let tipBottom = { x: 0, y: s };
+                let tipLeft = { x: -s, y: 0 };
+
+                // Control Points for concave curves
+                let controlDist = s * (1 - valleyDepthFactor);
+                let cpTopRight = { x: controlDist, y: -controlDist };
+                let cpBottomRight = { x: controlDist, y: controlDist };
+                let cpBottomLeft = { x: -controlDist, y: controlDist };
+                let cpTopLeft = { x: -controlDist, y: -controlDist };
+
+                beginShape();
+                vertex(tipTop.x, tipTop.y);
+                quadraticVertex(cpTopRight.x, cpTopRight.y, tipRight.x, tipRight.y);
+                quadraticVertex(cpBottomRight.x, cpBottomRight.y, tipBottom.x, tipBottom.y);
+                quadraticVertex(cpBottomLeft.x, cpBottomLeft.y, tipLeft.x, tipLeft.y);
+                quadraticVertex(cpTopLeft.x, cpTopLeft.y, tipTop.x, tipTop.y);
+                endShape();
+
+                // Inner diamond with same shape
+                scale(0.6);
+                beginShape();
+                vertex(tipTop.x, tipTop.y);
+                quadraticVertex(cpTopRight.x, cpTopRight.y, tipRight.x, tipRight.y);
+                quadraticVertex(cpBottomRight.x, cpBottomRight.y, tipBottom.x, tipBottom.y);
+                quadraticVertex(cpBottomLeft.x, cpBottomLeft.y, tipLeft.x, tipLeft.y);
+                quadraticVertex(cpTopLeft.x, cpTopLeft.y, tipTop.x, tipTop.y);
+                endShape();
+
+                pop();
+
+                // Label (outside the rotation)
+                push();
+                fill(120, 100, 100);
+                noStroke();
+                textAlign(CENTER, CENTER);
+                textSize(14);
+                text("SYSTEM RESET", this.pos.x, this.pos.y + this.r + this.floatOffset + 20);
+                pop();
+            }
         }
 
         // Game classes
@@ -523,23 +860,58 @@
                 this.width = BASE_WIDTH;
                 this.height = BASE_HEIGHT;
                 this.isDestroyed = false;
+
+                // ML Model names
+                const modelNames = ["Neural Net", "XGBoost", "Random Forest"];
+                this.modelName = modelNames[id] || `Model ${id + 1}`;
             }
 
             render() {
                 if (!this.isDestroyed) {
                     push();
-                    fill(120, 80, 90);
-                    stroke(120, 100, 100);
-                    strokeWeight(2);
-                    rectMode(CENTER);
-                    rect(this.x, this.y, this.width, this.height);
 
-                    // Draw system label
+                    // Dark background for contrast
+                    fill(120, 30, 20);
+                    stroke(120, 100, 100);
+                    strokeWeight(3);
+                    rectMode(CENTER);
+                    rect(this.x, this.y, this.width, this.height, 8);
+
+                    // Server rack lines for ML model appearance
+                    stroke(120, 80, 60);
+                    strokeWeight(1);
+                    for (let i = 0; i < 3; i++) {
+                        let yOffset = -this.height/2 + 12 + i * 12;
+                        line(this.x - this.width/2 + 8, this.y + yOffset,
+                             this.x + this.width/2 - 8, this.y + yOffset);
+                    }
+
+                    // Bright model name label for contrast
                     fill(120, 100, 100);
                     noStroke();
                     textAlign(CENTER, CENTER);
-                    textSize(12);
-                    text(`SYS-${this.id + 1}`, this.x, this.y);
+                    textSize(16);
+                    text(this.modelName, this.x, this.y);
+
+                    // Status indicator
+                    fill(120, 100, 100);
+                    circle(this.x, this.y - this.height/2 - 8, 6);
+
+                    pop();
+                } else {
+                    // Destroyed model
+                    push();
+                    fill(0, 80, 30);
+                    stroke(0, 100, 60);
+                    strokeWeight(2);
+                    rectMode(CENTER);
+                    rect(this.x, this.y, this.width, this.height, 8);
+
+                    fill(0, 100, 100);
+                    noStroke();
+                    textAlign(CENTER, CENTER);
+                    textSize(20);
+                    text("OFFLINE", this.x, this.y);
                     pop();
                 }
             }
@@ -582,23 +954,48 @@
             render() {
                 push();
 
-                // Draw enemy as a glowing threat
-                fill(0, 100, 100, 80);
+                // Draw enemy with enhanced glow effects
+                // Outer glow ring
+                fill(0, 100, 100, 30);
+                noStroke();
+                ellipse(this.x, this.y, this.size * 1.8);
+
+                // Middle glow ring
+                fill(0, 100, 100, 50);
+                ellipse(this.x, this.y, this.size * 1.4);
+
+                // Main hollow threat circle
+                noFill();
                 stroke(0, 100, 100);
-                strokeWeight(2);
+                strokeWeight(3);
                 ellipse(this.x, this.y, this.size);
 
-                // Draw threat name
-                fill(0, 100, 100);
+                // Inner pulsing core
+                let pulseSize = this.size * 0.4 + sin(frameCount * 0.15) * 5;
+                fill(0, 100, 100, 90);
                 noStroke();
-                textAlign(CENTER, CENTER);
-                textSize(10);
-                text(this.name, this.x, this.y - this.size/2 - 15);
+                ellipse(this.x, this.y, pulseSize);
 
-                // Draw trajectory line
+                // Draw threat name with glow
+                fill(0, 0, 0, 120); // Dark background for readability
+                noStroke();
+                rectMode(CENTER);
+                rect(this.x, this.y - this.size/2 - 25, textWidth(this.name) + 10, 25, 5);
+
+                fill(0, 100, 100);
+                textAlign(CENTER, CENTER);
+                textSize(16); // Slightly smaller for better fit
+                text(this.name, this.x, this.y - this.size/2 - 25);
+
+                // Draw trajectory line with glow
                 if (this.targetBase && !this.targetBase.isDestroyed) {
-                    stroke(0, 100, 100, 30);
-                    strokeWeight(1);
+                    stroke(0, 100, 100, 40);
+                    strokeWeight(2);
+                    line(this.x, this.y, this.targetBase.x, this.targetBase.y);
+
+                    // Dimmer background line for depth
+                    stroke(0, 100, 100, 15);
+                    strokeWeight(6);
                     line(this.x, this.y, this.targetBase.x, this.targetBase.y);
                 }
 
@@ -609,6 +1006,21 @@
                 if (!this.targetBase) return false;
                 const distance = dist(this.x, this.y, this.targetBase.x, this.targetBase.y);
                 return distance < this.size/2 + this.targetBase.width/2;
+            }
+
+            retarget(newTargetBase) {
+                this.targetBase = newTargetBase;
+                // Recalculate trajectory to new target
+                if (newTargetBase) {
+                    const dx = newTargetBase.x - this.x;
+                    const dy = newTargetBase.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    this.vx = (dx / distance) * this.speed;
+                    this.vy = (dy / distance) * this.speed;
+                } else {
+                    this.vx = 0;
+                    this.vy = this.speed;
+                }
             }
         }
 
@@ -675,20 +1087,28 @@
                 this.y = y;
                 this.maxRadius = maxRadius;
                 this.currentRadius = 0;
-                this.life = EXPLOSION_DURATION;
-                this.maxLife = EXPLOSION_DURATION;
+                this.startTime = millis();
+                this.duration = 1000; // 1 second for regular explosions
+                this.isSystemReset = false; // Default to regular explosion
             }
 
             update() {
-                this.life--;
-                this.currentRadius = map(this.life, this.maxLife, 0, 0, this.maxRadius);
+                let elapsed = millis() - this.startTime;
+                let progress = elapsed / this.duration;
+                this.currentRadius = progress * this.maxRadius;
+            }
+
+            getAlpha() {
+                let elapsed = millis() - this.startTime;
+                let progress = elapsed / this.duration;
+                return map(progress, 0, 1, 80, 0);
             }
 
             render() {
-                if (this.life > 0) {
+                if (!this.isDead()) {
                     push();
 
-                    const alpha = map(this.life, 0, this.maxLife, 0, 80);
+                    const alpha = this.getAlpha();
 
                     // Outer ring
                     stroke(60, 100, 100, alpha);
@@ -706,13 +1126,14 @@
             }
 
             hits(enemy) {
-                if (this.life <= 0) return false;
+                if (this.isDead()) return false;
                 const distance = dist(this.x, this.y, enemy.x, enemy.y);
                 return distance < this.currentRadius + enemy.size/2;
             }
 
             isDead() {
-                return this.life <= 0;
+                let elapsed = millis() - this.startTime;
+                return elapsed >= this.duration;
             }
         }
     </script>
