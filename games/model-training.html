@@ -3,62 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neural Network Training - Model Training Phase</title>
+    <title>Model Training - Training Phase</title>
     <link rel="stylesheet" href="../shared/shared.css">
     <style>
-        .training-status {
+        .game-info {
             position: absolute;
             top: 20px;
-            left: 20px;
             right: 20px;
-            display: flex;
-            justify-content: space-between;
             z-index: 100;
             color: var(--matrix-green-bright);
             font-family: 'Courier New', monospace;
+            text-align: right;
             text-shadow: 0 0 10px var(--matrix-green-bright);
         }
 
-        .metrics-panel {
-            display: flex;
-            gap: 30px;
-        }
-
-        .metric-item {
-            text-align: center;
-        }
-
-        .metric-label {
-            font-size: 12px;
-            color: var(--matrix-green-medium);
-        }
-
-        .metric-value {
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .coming-soon {
+        .powerup-indicator {
             position: absolute;
             top: 50%;
             left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
+            transform: translateX(-50%);
+            z-index: 100;
             color: var(--matrix-green-bright);
             font-family: 'Courier New', monospace;
-        }
-
-        .feature-list {
-            margin-top: 40px;
-            text-align: left;
-            color: var(--matrix-green-medium);
-            line-height: 2;
+            text-align: center;
+            text-shadow: 0 0 20px var(--matrix-green-bright);
+            animation: matrix-glow 1s ease-in-out infinite alternate;
         }
 
         .controls-help {
             position: absolute;
             bottom: 20px;
             left: 20px;
+            z-index: 100;
             color: var(--matrix-green-dark);
             font-family: 'Courier New', monospace;
             font-size: 12px;
@@ -68,56 +44,25 @@
 </head>
 <body>
     <div class="game-container">
-        <div class="training-status">
-            <div class="metrics-panel">
-                <div class="metric-item">
-                    <div class="metric-label">ACCURACY</div>
-                    <div class="metric-value" id="accuracy">0.00%</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">EPOCH</div>
-                    <div class="metric-value" id="epoch">0</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">LOSS</div>
-                    <div class="metric-value" id="loss">1.000</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">PHASE</div>
-                    <div class="metric-value">TRAINING</div>
-                </div>
-            </div>
+        <div class="game-ui">
+            <div class="score-display">SCORE: <span id="score">00000000</span></div>
+            <div class="lives-display">LIVES: <span id="lives">3</span></div>
+            <div class="level-display">PHASE: MODEL TRAINING</div>
         </div>
 
-        <div class="coming-soon">
-            <h1 style="font-size: 48px; margin-bottom: 20px; animation: matrix-glow 2s ease-in-out infinite alternate;">
-                NEURAL NETWORK TRAINING
-            </h1>
-            <h2 style="font-size: 24px; margin-bottom: 40px; color: var(--matrix-green-medium);">
-                Coming Soon!
-            </h2>
+        <div class="game-info">
+            <div>HERO: <span id="current-hero">LAMBDA MAN</span></div>
+            <div id="powerup-status" style="display: none;">HYPERPARAMETER OPTIMIZER READY</div>
+        </div>
 
-            <div class="feature-list">
-                <h3 style="color: var(--matrix-green-bright); margin-bottom: 20px;">This game will feature:</h3>
-                <div>• Space Invaders-style gameplay with neural network nodes as enemies</div>
-                <div>• Hyperparameter bullets to optimize model performance</div>
-                <div>• Training accuracy progression as score system</div>
-                <div>• Overfitting enemies that require careful strategy</div>
-                <div>• Validation checkpoints and early stopping mechanics</div>
-                <div>• Gradient descent power-ups for faster learning</div>
-                <div>• Boss battles against complex model architectures</div>
-            </div>
-
-            <div style="margin-top: 60px;">
-                <button class="nav-button" onclick="simulateTraining()">
-                    SIMULATE TRAINING SESSION
-                </button>
-            </div>
+        <div id="powerup-indicator" class="powerup-indicator" style="display: none;">
+            <div style="font-size: 24px; margin-bottom: 10px;">OPTIMIZER COLLECTED!</div>
+            <div style="font-size: 18px;">Press SPACE to unleash Hyperparameter Optimizer</div>
         </div>
 
         <div class="controls-help">
-            <div>SPACE: Simulate Training • ESC: Return to Hub</div>
-            <div>Full implementation coming in next update!</div>
+            <div>ARROW KEYS: Move • SPACE: Shoot Training Data</div>
+            <div>P/ESC: Pause • Train the model by defeating training batches!</div>
         </div>
     </div>
 
@@ -127,114 +72,759 @@
     <!-- Shared utilities -->
     <script src="../shared/shared.js"></script>
 
+    <!-- Game classes -->
+    <script src="model-training-classes.js"></script>
+
     <!-- Game script -->
     <script>
-        // Model Training Game - Neural Network Training (Placeholder)
-        // Space Invaders style with neural network training mechanics
+        // Model Training Game - Space Invaders Style
+        // Train neural networks by defeating waves of training data
 
-        let matrixStreams = [];
+        // Game state
+        let gameState = 'playing'; // 'playing', 'paused', 'heroSwap', 'gameOver', 'victory'
+        let score = 0;
+        let lives = 3;
+        let gameOver = false;
         let gameStartTime;
-        let isTraining = false;
-        let accuracy = 0;
-        let epoch = 0;
-        let loss = 1.0;
-        let trainingInterval;
+
+        // Game objects
+        let player;
+        let bullets = [];
+        let aliens = [];
+        let matrixStreams = [];
+        let powerup = null;
+        let hasPowerup = false;
+        let powerupSpawned = false;
+        let fireworks = [];
+        let trainingParticles = [];
+        let bossSpawned = false;
+
+        // Hero system
+        let heroImages = [];
+        let heroNames = [];
+        let heroFaceImages = [];
+        let selectedHero = 0;
+
+        // Firing system
+        let lastFireTime = 0;
+        const FIRE_RATE = 8; // Fires per second (8 = 125ms between shots)
+
+        // Game constants
+        const PLAYER_SIZE = 100;
+        const BULLET_SPEED = 8;
+        const PLAYER_TURN_RATE = 0.08;
+        const PLAYER_THRUST = 0.15;
+        const PLAYER_FRICTION = 0.99;
+        const PLAYER_MAX_SPEED = 6;
+        const PLAYER_INVINCIBILITY_DURATION = 120;
+
+        function preload() {
+            // Define the hero image files (original system)
+            const heroFiles = ['Dave.png', 'Nadya.png']; // Add more hero PNG files here
+            const faceFiles = ['Dave_face.png', 'Nadya_face.png']; // Face images for menus
+
+            console.log('Preloading hero images...');
+
+            // Load all hero images dynamically
+            for (let i = 0; i < heroFiles.length; i++) {
+                const heroPath = '../shared/sprites/' + heroFiles[i];
+                const facePath = '../shared/sprites/' + faceFiles[i];
+
+                console.log(`Loading hero ${i}: ${heroPath}`);
+                heroImages[i] = loadImage(heroPath);
+                heroFaceImages[i] = loadImage(facePath);
+                // Extract name from filename (remove .png extension)
+                heroNames[i] = heroFiles[i].replace('.png', '');
+            }
+
+            console.log(`Loaded ${heroImages.length} hero images`);
+        }
+
+        function getFaceRotation(heroIndex) {
+            // Animation cycle: 6.5 seconds total (0.5s animation + 2s offset + 4s pause)
+            let cycleDuration = 6.5 * 60; // Convert to frames (assuming 60fps)
+            let animationDuration = 0.5 * 60; // 0.5 seconds in frames
+
+            // Calculate offset: player 1 starts immediately, player 2 starts after 2 seconds
+            let startOffset = heroIndex * 2 * 60; // 2 seconds offset between players
+
+            // Calculate position in animation cycle
+            let time = (frameCount + startOffset) % cycleDuration;
+
+            if (time < animationDuration) {
+                // During animation: wiggle back and forth
+                let progress = time / animationDuration;
+                return sin(progress * TWO_PI * 2) * 0.3; // 2 full wiggles in 0.5 seconds
+            } else {
+                // During pause: no rotation
+                return 0;
+            }
+        }
 
         function setup() {
+            console.log('Setting up Model Training game...');
+
             let canvas = createCanvas(windowWidth, windowHeight);
             canvas.parent(document.querySelector('.game-container'));
 
-            colorMode(HSB, 360, 100, 100, 100);
+            // Make canvas focusable and auto-focus for keyboard input
+            canvas.elt.setAttribute('tabindex', '0');
+            canvas.elt.style.outline = 'none'; // Remove focus outline
 
-            // Initialize matrix background (original implementation)
-            const matrixRain = MLOpsUtils.createMatrixRain(16, 10, 30);
-            matrixStreams = matrixRain.streams;
+            // Force focus after a short delay to ensure DOM is ready
+            setTimeout(() => {
+                canvas.elt.focus();
+                console.log('Canvas focused');
+            }, 100);
+
+            // Ensure canvas gets focus on any click or touch
+            canvas.mousePressed(() => {
+                canvas.elt.focus();
+                return false; // Prevent default
+            });
+
+            // Also focus on touch for mobile
+            canvas.elt.addEventListener('touchstart', () => {
+                canvas.elt.focus();
+            });
+
+            colorMode(HSB, 360, 100, 100, 100);
+            angleMode(RADIANS);
+
+            // Initialize Matrix Rain directly using p5.js classes
+            const SYMBOL_SIZE = 16;
+            const MIN_STREAM_LENGTH = 10;
+            const MAX_STREAM_LENGTH = 30;
+
+            console.log('Initializing matrix rain...');
+            let x = 0;
+            for (let i = 0; x < width + SYMBOL_SIZE; i++) {
+                let stream = new MatrixStream(x);
+                stream.generateSymbols();
+                matrixStreams.push(stream);
+                x += SYMBOL_SIZE * 0.9;
+            }
+            console.log(`Created ${matrixStreams.length} matrix streams`);
+
+            // Initialize player
+            console.log('Initializing player...');
+            player = new Player();
+            console.log('Player created:', player);
+
+            // Spawn initial aliens
+            console.log('Spawning training aliens...');
+            createAliens();
+            console.log(`Spawned ${aliens.length} aliens`);
 
             gameStartTime = millis();
 
-            console.log('Model Training game (placeholder) initialized');
+            console.log('Model Training game initialization complete');
+            console.log('Hero images loaded:', heroImages.length);
+            console.log('Selected hero:', selectedHero);
         }
 
         function draw() {
-            background(0, 0, 5);
+            background(220, 10, 10, 35); // Original dark blue-black background with trail effect
 
-            // Render matrix background
-            matrixRain.update();
-            matrixRain.render(drawingContext);
+            if (gameState === 'playing') {
+                // Render matrix background during gameplay
+                for (let stream of matrixStreams) {
+                    stream.render();
+                }
+                updateGame();
+            } else if (gameState === 'paused') {
+                console.log('Drawing pause menu');
+                displayPauseMenu();
+            } else if (gameState === 'heroSwap') {
+                console.log('Drawing hero swap menu');
+                displayHeroSwap(); // This function renders its own matrix rain
+            } else if (gameState === 'gameOver') {
+                console.log('Drawing game over screen');
+                displayGameOver();
+            } else if (gameState === 'victory') {
+                displayVictory(); // This function renders its own matrix rain
+            } else {
+                console.log('Unknown game state:', gameState);
+            }
 
             updateUI();
+
+            // Debug info (extended for performance monitoring)
+            if (frameCount % 120 === 0) { // Every 2 seconds
+                console.log('=== PERFORMANCE DEBUG ===');
+                console.log('Game state:', gameState);
+                console.log('Aliens:', aliens.length);
+                console.log('Bullets:', bullets.length);
+                console.log('Fireworks:', fireworks.length);
+                console.log('Training Particles:', trainingParticles.length);
+                console.log('Matrix Streams:', matrixStreams.length);
+                console.log('FPS estimate:', frameRate().toFixed(1));
+                console.log('========================');
+            }
+        }
+
+        function updateGame() {
+            if (gameOver || gameState === 'gameOver') return;
+
+            // Update player
+            player.handleInput();
+            player.update();
+            player.edges();
+            player.render();
+
+            // Handle continuous firing with spacebar
+            if (keyIsDown(32)) { // 32 = spacebar keycode
+                let currentTime = millis();
+                if (currentTime - lastFireTime >= (1000 / FIRE_RATE)) {
+                    // Check if there's already a Hyperparameter Optimizer active
+                    let optimizerActive = false;
+                    for (let bullet of bullets) {
+                        if (bullet instanceof HyperparameterOptimizer) {
+                            optimizerActive = true;
+                            break;
+                        }
+                    }
+                    
+                    // Only fire if no Optimizer is active
+                    if (!optimizerActive) {
+                        player.shoot();
+                        lastFireTime = currentTime;
+                    }
+                }
+            }
+
+            // Update bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].update();
+                bullets[i].render();
+
+                if (bullets[i].isOffscreen()) {
+                    // Check for HyperparameterOptimizer victory condition
+                    if (bullets[i] instanceof HyperparameterOptimizer && bullets[i].expanding) {
+                        console.log('HyperparameterOptimizer finished expanding - triggering victory!');
+                        // Clear all aliens and trigger victory
+                        for (let alien of aliens) {
+                            if (!alien.destroyed) {
+                                // Create particles for visual effect
+                                for (let j = 0; j < 5; j++) {
+                                    let particleX = alien.x + random(-20, 20);
+                                    let particleY = alien.y + random(-20, 20);
+                                    fireworks.push(new Firework(particleX, particleY));
+                                }
+                                for (let j = 0; j < 2; j++) {
+                                    trainingParticles.push(new TrainingParticle(alien.x, alien.y));
+                                }
+                                score += alien.points;
+                                alien.destroyed = true;
+                            }
+                        }
+                        gameState = 'victory';
+                        console.log('Victory state set! Aliens cleared:', aliens.filter(a => !a.destroyed).length);
+                    }
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Update training particles
+            for (let i = trainingParticles.length - 1; i >= 0; i--) {
+                trainingParticles[i].update();
+                trainingParticles[i].render();
+                if (trainingParticles[i].isDead()) {
+                    trainingParticles.splice(i, 1);
+                }
+            }
+
+            // Update aliens
+            for (let i = aliens.length - 1; i >= 0; i--) {
+                if (!aliens[i].destroyed) {
+                    aliens[i].update();
+                    aliens[i].render();
+
+                    // Check player collision
+                    if (!player.isInvincible && player.hits && player.hits(aliens[i])) {
+                        playerHit();
+                    }
+                }
+            }
+
+            // Check HyperparameterOptimizer expansion
+            let optimizerExpanding = false;
+            for (let bullet of bullets) {
+                if (bullet instanceof HyperparameterOptimizer && bullet.expanding) {
+                    optimizerExpanding = true;
+                    break;
+                }
+            }
+
+            // Bullet-alien collisions
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                for (let j = aliens.length - 1; j >= 0; j--) {
+                    if (bullets[i] && aliens[j] && !aliens[j].destroyed && bullets[i].hits && bullets[i].hits(aliens[j])) {
+                        // Handle boss damage
+                        if (aliens[j].isBoss) {
+                            let fromPowerup = bullets[i] instanceof HyperparameterOptimizer;
+                            console.log('Boss hit! From powerup:', fromPowerup, 'Boss health:', aliens[j].health);
+                            let destroyed = aliens[j].takeDamage(fromPowerup);
+                            if (destroyed) {
+                                console.log('Boss destroyed!');
+                                score += aliens[j].points;
+                                // Create explosion particles
+                                for (let k = 0; k < 10; k++) {
+                                    fireworks.push(new Firework(aliens[j].x, aliens[j].y));
+                                }
+                            }
+                        } else {
+                            // Regular alien destruction
+                            score += aliens[j].points;
+                            aliens[j].destroyed = true;
+                            // Create particles
+                            for (let k = 0; k < 5; k++) {
+                                trainingParticles.push(new TrainingParticle(aliens[j].x, aliens[j].y));
+                            }
+                        }
+                        
+                        bullets.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+
+            // Spawn powerup at score 100 (after ~2 aliens)
+            if (score >= 100 && !powerupSpawned && !hasPowerup) {
+                powerup = new HyperparameterPowerup(width/2, height/2);
+                powerupSpawned = true;
+            }
+
+            // Update powerup
+            if (powerup) {
+                powerup.update();
+                powerup.render();
+
+                // Check if bullet hits powerup
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    if (bullets[i] && powerup.checkCollection(bullets[i])) {
+                        hasPowerup = true;
+                        powerup = null;
+                        bullets.splice(i, 1);
+
+                        // Show powerup indicator
+                        document.getElementById('powerup-indicator').style.display = 'block';
+                        document.getElementById('powerup-status').style.display = 'block';
+                        break;
+                    }
+                }
+            }
+
+            // Check if all wave 1 aliens are destroyed, spawn boss
+            let wave1Aliens = aliens.filter(a => a.wave === 1);
+            if (wave1Aliens.length > 0 && wave1Aliens.every(a => a.destroyed) && !bossSpawned) {
+                aliens.push(new ComplexModelBoss(width/2, 150));
+                bossSpawned = true;
+                console.log('Boss spawned!');
+            }
+            
+            // Check victory condition
+            if (aliens.every(a => a.destroyed)) {
+                gameState = 'victory';
+                console.log('All aliens defeated - victory!');
+            }
+
+            // Update fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update();
+                fireworks[i].render();
+                if (fireworks[i].isDead()) {
+                    fireworks.splice(i, 1);
+                }
+            }
+        }
+
+        function createAliens() {
+            // Wave 1: 5 aliens in a row
+            for (let i = 0; i < 5; i++) {
+                aliens.push(new NeonAlien(
+                    200 + i * 80,  // x position
+                    100,           // y position
+                    'BATCH_' + (i + 1),
+                    color(0, 255, 255),  // cyan
+                    50  // points
+                ));
+            }
+            console.log(`Created ${aliens.length} training aliens`);
+        }
+
+        function playerHit() {
+            lives--;
+            console.log(`Player hit! Lives remaining: ${lives}`);
+            
+            if (lives <= 0) {
+                console.log('Game over - no lives remaining!');
+                gameOver = true;
+                gameState = 'gameOver';
+            } else {
+                console.log('Player respawning...');
+                player.reset();
+            }
         }
 
         function updateUI() {
-            document.getElementById('accuracy').textContent = (accuracy * 100).toFixed(2) + '%';
-            document.getElementById('epoch').textContent = epoch;
-            document.getElementById('loss').textContent = loss.toFixed(3);
+            document.getElementById('score').textContent = MLOpsUtils.formatScore(score);
+            document.getElementById('lives').textContent = lives;
+            document.getElementById('current-hero').textContent = heroNames[selectedHero];
+
+            // Hide powerup indicator after a while
+            if (hasPowerup && document.getElementById('powerup-indicator').style.display === 'block') {
+                setTimeout(() => {
+                    document.getElementById('powerup-indicator').style.display = 'none';
+                }, 3000);
+            }
         }
 
-        function simulateTraining() {
-            if (isTraining) return;
+        function displayPauseMenu() {
+            console.log('displayPauseMenu() called');
 
-            isTraining = true;
-            accuracy = 0;
-            epoch = 0;
-            loss = 1.0;
+            // Semi-transparent overlay
+            push();
+            fill(0, 0, 0, 50);
+            rect(0, 0, width, height);
+            pop();
 
-            // Simulate training progress
-            trainingInterval = setInterval(() => {
-                epoch++;
-                accuracy = Math.min(0.95, accuracy + Math.random() * 0.05);
-                loss = Math.max(0.01, loss - Math.random() * 0.05);
+            // Pause menu box (matching original styling)
+            push();
+            fill(220, 20, 20, 90);
+            stroke(120, 100, 100);
+            strokeWeight(2);
+            rectMode(CENTER);
+            rect(width / 2, height / 2, 400, 350, 10);
+            pop();
 
-                if (epoch >= 20 || accuracy >= 0.90) {
-                    clearInterval(trainingInterval);
-                    isTraining = false;
-                    completeTraining();
+            // Title
+            fill(120, 100, 100);
+            textSize(36);
+            textAlign(CENTER, CENTER);
+            text("PAUSED", width / 2, height / 2 - 120);
+
+            // Current hero display with animated face
+            push();
+            translate(width / 2, height / 2 - 50);
+            rotate(getFaceRotation(selectedHero));
+
+            // Draw hero face if loaded
+            if (heroFaceImages[selectedHero] && heroFaceImages[selectedHero].width > 0) {
+                imageMode(CENTER);
+                let faceScale = 0.6;
+                image(heroFaceImages[selectedHero], 0, 0,
+                      heroFaceImages[selectedHero].width * faceScale,
+                      heroFaceImages[selectedHero].height * faceScale);
+            } else {
+                // Fallback circle
+                fill(120, 100, 100);
+                noStroke();
+                circle(0, 0, 60);
+            }
+            pop();
+
+            textSize(16);
+            fill(120, 80, 90);
+            text(`Playing as: ${heroNames[selectedHero]}`, width / 2, height / 2);
+
+            // Menu options (matching original)
+            textSize(20);
+            fill(120, 90, 100);
+            text("[ENTER] Continue Playing", width / 2, height / 2 + 50);
+            text("[H] Change Hero", width / 2, height / 2 + 80);
+            text("[R] Restart Game", width / 2, height / 2 + 110);
+            text("[M] Main Menu", width / 2, height / 2 + 140);
+
+            console.log('Pause menu rendered successfully');
+        }
+
+        function displayHeroSwap() {
+            console.log('displayHeroSwap() called');
+
+            // Keep the game visible in background (frozen)
+            // Display all game elements but frozen
+            for (let stream of matrixStreams) {
+                stream.render();
+            }
+            if (player) {
+                player.render();
+            }
+            for (let asteroid of asteroids) {
+                asteroid.render();
+            }
+            for (let bullet of bullets) {
+                bullet.render();
+            }
+
+            // Semi-transparent overlay
+            push();
+            fill(0, 0, 0, 70);
+            rect(0, 0, width, height);
+            pop();
+
+            // Hero selection box (matching original)
+            push();
+            fill(220, 20, 20, 90);
+            stroke(120, 100, 100);
+            strokeWeight(2);
+            rectMode(CENTER);
+            let boxWidth = min(600, width * 0.8);
+            let boxHeight = 400;
+            rect(width / 2, height / 2, boxWidth, boxHeight, 10);
+            pop();
+
+            // Title
+            fill(120, 100, 100);
+            textSize(32);
+            textAlign(CENTER, CENTER);
+            text("CHANGE HERO", width / 2, height / 2 - 140);
+
+            textSize(18);
+            fill(120, 80, 90);
+            text("Select a new hero to continue with current progress", width / 2, height / 2 - 100);
+
+            // Calculate spacing for heroes
+            let heroCount = heroImages.length;
+            let spacing = min(200, boxWidth / (heroCount + 1));
+            let startX = width / 2 - (spacing * (heroCount - 1) / 2);
+
+            // Draw all hero options using face images
+            for (let i = 0; i < heroCount && i < heroFaceImages.length; i++) {
+                push();
+                let heroX = startX + spacing * i;
+                let heroY = height / 2;
+
+                // Highlight current hero
+                if (i === selectedHero) {
+                    stroke(120, 100, 100);
+                    strokeWeight(3);
+                    noFill();
+                    ellipse(heroX, heroY, 120, 120);
                 }
-            }, 200);
+
+                // Apply face animation rotation
+                translate(heroX, heroY);
+                rotate(getFaceRotation(i));
+
+                // Draw hero face if loaded
+                if (heroFaceImages[i] && heroFaceImages[i].width > 0) {
+                    imageMode(CENTER);
+                    let faceScale = 0.6; // Smaller scale for hero swap
+                    image(heroFaceImages[i], 0, 0,
+                          heroFaceImages[i].width * faceScale,
+                          heroFaceImages[i].height * faceScale);
+                } else {
+                    // Fallback circle
+                    fill(120, 100, 100);
+                    noStroke();
+                    circle(0, 0, 60);
+                }
+                pop();
+
+                // Hero name and key prompt
+                textSize(18);
+                fill(120, 80, 90);
+                text(heroNames[i], heroX, heroY + 70);
+                text(`[${i + 1}]`, heroX, heroY + 90);
+            }
+
+            // Instructions
+            textSize(16);
+            fill(120, 60, 70);
+            text("Press number to select • ESC to cancel", width / 2, height / 2 + 150);
+
+            console.log('Hero swap menu rendered successfully');
         }
 
-        function completeTraining() {
-            const finalScore = Math.floor(accuracy * 10000 + (20 - epoch) * 100);
+        function displayGameOver() {
+            console.log('displayGameOver() called');
+            
+            // Semi-transparent overlay
+            fill(0, 0, 0, 180);
+            rect(0, 0, width, height);
 
-            MLOpsNavigation.showCompletionOverlay({
-                message: 'Neural network training simulation complete! Model achieved good accuracy.',
-                score: finalScore,
-                game: 'model-training'
-            }, () => {
-                const gameData = {
-                    game: 'model-training',
-                    score: finalScore,
-                    completed: true,
-                    timeSpent: millis() - gameStartTime,
-                    message: 'Neural network successfully trained! Ready for deployment.'
-                };
+            // Use direct p5.js text rendering
+            push();
+            fill(0, 100, 100); // Red for critical error
+            textAlign(CENTER, CENTER);
+            
+            textSize(36);
+            text('DATA CORRUPTION CRITICAL', width/2, height/2 - 60);
+            
+            textSize(48);
+            fill(120, 100, 100); // Matrix green
+            text('MISSION FAILED', width/2, height/2 - 20);
+            
+            textSize(24);
+            fill(120, 70, 80);
+            text(`Final Score: ${score.toString().padStart(8, '0')}`, width/2, height/2 + 40);
+            
+            textSize(18);
+            fill(120, 60, 70);
+            text('Press R to retry or ESC to return to hub', width/2, height/2 + 80);
+            pop();
+            
+            console.log('Game over screen rendered successfully');
+        }
 
-                MLOpsNavigation.returnToHub(gameData);
-            });
+        function displayVictory() {
+            // Matrix rain continues (like original)
+            for (let stream of matrixStreams) {
+                stream.render();
+            }
+
+            // Create fireworks (matching original)
+            if (frameCount % 10 === 0) {
+                let x = random(width);
+                let y = random(height * 0.2, height * 0.5);
+                for (let i = 0; i < 50; i++) {
+                    fireworks.push(new Firework(x, y));
+                }
+            }
+
+            // Update and render fireworks
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                fireworks[i].update();
+                fireworks[i].render();
+                if (fireworks[i].isDead()) {
+                    fireworks.splice(i, 1);
+                }
+            }
+
+            // Victory text (matching original styling)
+            fill(120, 100, 100);
+            textSize(72);
+            textAlign(CENTER, CENTER);
+            text("YOU WIN!", width / 2, height / 2 - 100);
+
+            textSize(36);
+            fill(180, 80, 90);
+            text("Data Matrix Cleaned!", width / 2, height / 2 - 20);
+
+            textSize(24);
+            fill(120, 70, 80);
+            text(`Final Score: ${score}`, width / 2, height / 2 + 40);
+            text(`Hero: ${heroNames[selectedHero]}`, width / 2, height / 2 + 80);
+
+            textSize(20);
+            fill(120, 60, 70);
+            text("Press R to play again", width / 2, height / 2 + 140);
+
+            textSize(16);
+            text("Press ESC to return to hub", width / 2, height / 2 + 170);
         }
 
         function keyPressed() {
-            if (key === ' ') {
-                simulateTraining();
-            } else if (keyCode === ESCAPE) {
-                if (trainingInterval) {
-                    clearInterval(trainingInterval);
+            console.log('Key pressed:', key, 'keyCode:', keyCode, 'gameState:', gameState);
+
+            if (gameState === 'playing') {
+                if (key === 'p' || key === 'P' || keyCode === ESCAPE) {
+                    console.log('Pausing game');
+                    gameState = 'paused';
+                } else if (key === ' ' && hasPowerup) {
+                    // Fire Hyperparameter Optimizer
+                    console.log('Firing Hyperparameter Optimizer!');
+                    bullets.push(new HyperparameterOptimizer(player.pos.x, player.pos.y));
+                    hasPowerup = false;
+                    document.getElementById('powerup-indicator').style.display = 'none';
+                    document.getElementById('powerup-status').style.display = 'none';
                 }
-
-                const gameData = {
-                    game: 'model-training',
-                    score: Math.floor(accuracy * 10000),
-                    completed: false,
-                    timeSpent: millis() - gameStartTime
-                };
-
-                MLOpsNavigation.returnToHub(gameData);
+            } else if (gameState === 'paused') {
+                if (keyCode === ENTER) {
+                    gameState = 'playing';
+                } else if (key === 'h' || key === 'H') {
+                    gameState = 'heroSwap';
+                } else if (key === 'r' || key === 'R') {
+                    resetGame();
+                    gameState = 'playing';
+                } else if (key === 'm' || key === 'M') {
+                    returnToHub();
+                }
+            } else if (gameState === 'heroSwap') {
+                // Handle hero selection (numbers 1-2 for Dave and Nadya)
+                let heroIndex = parseInt(key) - 1;
+                if (!isNaN(heroIndex) && heroIndex >= 0 && heroIndex < heroNames.length) {
+                    selectedHero = heroIndex;
+                    console.log(`Switched to hero: ${heroNames[selectedHero]}`);
+                    gameState = 'playing'; // Resume game with new hero
+                } else if (keyCode === ESCAPE) {
+                    gameState = 'paused'; // Go back to pause menu
+                }
+            } else if (gameState === 'gameOver') {
+                if (key === 'r' || key === 'R') {
+                    resetGame();
+                } else if (keyCode === ESCAPE) {
+                    returnToHub();
+                }
+            } else if (gameState === 'victory') {
+                if (key === 'r' || key === 'R') {
+                    console.log('Restarting game from victory screen');
+                    resetGame();
+                    gameState = 'playing';
+                } else if (keyCode === ESCAPE) {
+                    console.log('Returning to hub from victory screen');
+                    returnToHub();
+                }
             }
+        }
+
+        function resetGame() {
+            score = 0;
+            lives = 3;
+            gameOver = false;
+            gameState = 'playing';
+            aliens = [];
+            bullets = [];
+            fireworks = [];
+            trainingParticles = [];
+            powerup = null;
+            hasPowerup = false;
+            powerupSpawned = false;
+            bossSpawned = false;
+            lastFireTime = 0; // Reset firing timer
+
+            player.reset();
+            createAliens();
+
+            document.getElementById('powerup-indicator').style.display = 'none';
+            document.getElementById('powerup-status').style.display = 'none';
+        }
+
+        function completeGame() {
+            const gameData = {
+                game: 'model-training',
+                score: score,
+                completed: true,
+                timeSpent: millis() - gameStartTime,
+                message: 'Model training complete! Neural networks ready for deployment.'
+            };
+
+            MLOpsNavigation.returnToHub(gameData);
+        }
+
+        function returnToHub() {
+            console.log('Returning to hub...');
+            // Simple redirect back to main page - no completion overlay
+            window.location.href = '../index.html';
         }
 
         function windowResized() {
             resizeCanvas(windowWidth, windowHeight);
-            matrixRain = MLOpsUtils.createMatrixRain(canvas.canvas, 30);
+
+            // Regenerate matrix streams for new size
+            const SYMBOL_SIZE = 16;
+            const MIN_STREAM_LENGTH = 10;
+            const MAX_STREAM_LENGTH = 30;
+
+            matrixStreams = [];
+            let x = 0;
+            for (let i = 0; x < width + SYMBOL_SIZE; i++) {
+                let stream = new MatrixStream(x);
+                stream.generateSymbols();
+                matrixStreams.push(stream);
+                x += SYMBOL_SIZE * 0.9;
+            }
         }
     </script>
 </body>
