@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lo-Fi Space Flight Simulator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+
+        #gameCanvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+
+        #throttle-container {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            width: 40px;
+            height: 200px;
+            z-index: 100;
+        }
+
+        #throttle-track {
+            position: absolute;
+            left: 50%;
+            top: 10px;
+            width: 2px;
+            height: 180px;
+            background: #ff6600;
+            transform: translateX(-50%);
+        }
+
+        #throttle-handle {
+            position: absolute;
+            left: 50%;
+            width: 20px;
+            height: 8px;
+            background: #ffb347;
+            border: 1px solid #ff8c00;
+            transform: translateX(-50%);
+            cursor: pointer;
+            top: 182px;
+        }
+
+        .throttle-pip {
+            position: absolute;
+            left: 50%;
+            width: 8px;
+            height: 2px;
+            background: #cc5500;
+            transform: translateX(-50%);
+        }
+
+        .throttle-pip-major {
+            position: absolute;
+            left: 50%;
+            width: 16px;
+            height: 3px;
+            background: #ff8c00;
+            transform: translateX(-50%);
+        }
+
+        #throttle-indicator {
+            position: absolute;
+            left: -8px;
+            width: 0;
+            height: 0;
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            border-left: 6px solid #ffb347;
+            transition: top 0.2s ease;
+        }
+
+        #crosshair {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #crosshair::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 2px;
+            background: #ffb347;
+            transform: translate(-50%, -50%);
+        }
+
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 30px;
+            height: 30px;
+            border: none;
+            background:
+                linear-gradient(to right, #ffa500 0%, #ffa500 8px, transparent 8px),
+                linear-gradient(to bottom, #ffa500 0%, #ffa500 8px, transparent 8px),
+                linear-gradient(to left, #ffa500 0%, #ffa500 8px, transparent 8px),
+                linear-gradient(to bottom, #ffa500 0%, #ffa500 8px, transparent 8px),
+                linear-gradient(to right, #ffa500 0%, #ffa500 8px, transparent 8px),
+                linear-gradient(to top, #ffa500 0%, #ffa500 8px, transparent 8px),
+                linear-gradient(to left, #ffa500 0%, #ffa500 8px, transparent 8px),
+                linear-gradient(to top, #ffa500 0%, #ffa500 8px, transparent 8px);
+            background-size:
+                8px 2px, 2px 8px,
+                8px 2px, 2px 8px,
+                8px 2px, 2px 8px,
+                8px 2px, 2px 8px;
+            background-position:
+                0 0, 0 0,
+                100% 0, 100% 0,
+                0 100%, 0 100%,
+                100% 100%, 100% 100%;
+            background-repeat: no-repeat;
+        }
+
+        #crosshair-tooltip {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 110px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #ffb347;
+            font-size: 11px;
+            padding: 6px 8px;
+            border: 1px solid #ffb347;
+            border-radius: 3px;
+            text-align: center;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #crosshair-tooltip.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #throttle-tooltip {
+            position: absolute;
+            right: 50px;
+            top: 80px;
+            width: 120px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #ffb347;
+            font-size: 11px;
+            padding: 6px 8px;
+            border: 1px solid #ffb347;
+            border-radius: 3px;
+            text-align: center;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #throttle-tooltip.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #warp-button {
+            position: absolute;
+            bottom: 250px;
+            right: 15px;
+            width: 70px;
+            height: 25px;
+            background: linear-gradient(to bottom, #ff8c00, #ff6600);
+            border: 2px solid #ffb347;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            font-size: 9px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 21px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+            z-index: 100;
+        }
+
+        #warp-button:hover {
+            background: linear-gradient(to bottom, #ffb347, #ff8c00);
+        }
+
+        #warp-button:active {
+            background: linear-gradient(to bottom, #ff6600, #cc5500);
+            transform: translateY(1px);
+        }
+
+        #warp-button.engaged {
+            background: linear-gradient(to bottom, #00ff00, #00cc00);
+            border-color: #00ff00;
+        }
+
+        #warp-button.engaged:hover {
+            background: linear-gradient(to bottom, #33ff33, #00ff00);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="crosshair">
+        <div id="crosshair-tooltip">Drag crosshair to steer</div>
+    </div>
+
+    <div id="throttle-container">
+        <div id="throttle-track"></div>
+        <div class="throttle-pip-major" style="top: 10px;"></div>
+        <div class="throttle-pip" style="top: 25px;"></div>
+        <div class="throttle-pip" style="top: 35px;"></div>
+        <div class="throttle-pip-major" style="top: 55px;"></div>
+        <div class="throttle-pip" style="top: 70px;"></div>
+        <div class="throttle-pip" style="top: 80px;"></div>
+        <div class="throttle-pip-major" style="top: 100px;"></div>
+        <div class="throttle-pip" style="top: 115px;"></div>
+        <div class="throttle-pip" style="top: 125px;"></div>
+        <div class="throttle-pip-major" style="top: 145px;"></div>
+        <div class="throttle-pip" style="top: 160px;"></div>
+        <div class="throttle-pip" style="top: 170px;"></div>
+        <div class="throttle-pip-major" style="top: 190px;"></div>
+        <div id="throttle-handle"></div>
+        <div id="throttle-indicator"></div>
+        <div id="throttle-tooltip">Drag to adjust travel speed</div>
+    </div>
+
+    <button id="warp-button">WARP</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const crosshair = document.getElementById('crosshair');
+
+        // Set up canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Game state variables
+        let mouseX, mouseY, targetMouseX, targetMouseY;
+        let velocityX = 0;
+        let velocityY = 0;
+        let rotationZ = 0;
+        let playerX = 0;
+        let playerY = 0;
+        let throttle = 0;
+        let actualSpeed = 0;
+        let isWarpEngaged = false;
+        let isWarpCharging = false;
+        let isDraggingThrottle = false;
+        let isMousePressed = false;
+        let hasUsedSteering = false;
+        let hasUsedThrottle = false;
+
+        // Initialize mouse positions
+        mouseX = targetMouseX = canvas.width / 2;
+        mouseY = targetMouseY = canvas.height / 2;
+
+        // Star class
+        class Star {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = (Math.random() - 0.5) * 4000;
+                this.y = (Math.random() - 0.5) * 4000;
+                this.z = Math.random() * 1000 + 1;
+                this.prevX = 0;
+                this.prevY = 0;
+            }
+
+            update() {
+                this.prevX = (this.x / this.z) * 150 + canvas.width / 2;
+                this.prevY = (this.y / this.z) * 150 + canvas.height / 2;
+
+                this.x -= velocityX * 10;
+                this.y -= velocityY * 10;
+
+                const effectiveSpeed = isWarpEngaged ? 3.0 : actualSpeed;
+                this.z -= (2 + effectiveSpeed * 20) + Math.abs(velocityX) * 2 + Math.abs(velocityY) * 2;
+
+                if (this.z <= 0) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+
+                let x = (this.x / this.z) * 150 + centerX;
+                let y = (this.y / this.z) * 150 + centerY;
+
+                const steerFactorX = (targetMouseX - centerX) / centerX;
+                const steerFactorY = (targetMouseY - centerY) / centerY;
+                const effectiveSpeed = isWarpEngaged ? 3.0 : actualSpeed;
+                const speedMultiplier = 1 + (effectiveSpeed * 1.5);
+
+                const shiftAmount = 120 * speedMultiplier;
+                x += steerFactorX * shiftAmount;
+                y += steerFactorY * shiftAmount;
+
+                const relX = x - centerX;
+                const relY = y - centerY;
+                const cosR = Math.cos(rotationZ);
+                const sinR = Math.sin(rotationZ);
+
+                x = centerX + (relX * cosR - relY * sinR);
+                y = centerY + (relX * sinR + relY * cosR);
+
+                if (isWarpEngaged && this.prevX && this.prevY) {
+                    let prevX = this.prevX + steerFactorX * shiftAmount;
+                    let prevY = this.prevY + steerFactorY * shiftAmount;
+
+                    const prevRelX = prevX - centerX;
+                    const prevRelY = prevY - centerY;
+                    prevX = centerX + (prevRelX * cosR - prevRelY * sinR);
+                    prevY = centerY + (prevRelX * sinR + prevRelY * cosR);
+
+                    const distance = Math.sqrt((x - prevX) ** 2 + (y - prevY) ** 2);
+                    if (distance > 2 && distance < 200) {
+                        const alpha = Math.max(0.2, (1000 - this.z) / 1000);
+                        ctx.strokeStyle = `rgba(255, 234, 167, ${alpha * 0.6})`;
+                        ctx.lineWidth = Math.max(1, Math.floor((1000 - this.z) / 400));
+                        ctx.beginPath();
+                        ctx.moveTo(Math.floor(prevX), Math.floor(prevY));
+                        ctx.lineTo(Math.floor(x), Math.floor(y));
+                        ctx.stroke();
+                    }
+                }
+
+                x = Math.floor(x);
+                y = Math.floor(y);
+
+                const size = Math.max(1, Math.floor((1000 - this.z) / 300));
+                const alpha = Math.max(0.3, (1000 - this.z) / 1000);
+
+                ctx.fillStyle = alpha > 0.7 ? '#ffeaa7' : '#fdcb6e';
+
+                if (size === 1) {
+                    ctx.fillRect(x, y, 1, 1);
+                } else if (size === 2) {
+                    ctx.fillRect(x - 1, y - 1, 2, 2);
+                } else {
+                    ctx.fillRect(x - 1, y - 1, 3, 3);
+                    ctx.fillStyle = '#fff5b7';
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+
+        // Create stars array
+        const stars = [];
+        for (let i = 0; i < 800; i++) {
+            stars.push(new Star());
+        }
+
+        // Utility functions
+        function updateCrosshair(x, y) {
+            crosshair.style.left = (x - 15) + 'px';
+            crosshair.style.top = (y - 15) + 'px';
+        }
+
+        function hideTooltip(tooltipId) {
+            const tooltip = document.getElementById(tooltipId);
+            if (tooltip) {
+                tooltip.classList.add('hidden');
+                setTimeout(() => tooltip.remove(), 300);
+            }
+        }
+
+        function handleMove(x, y) {
+            if (isMousePressed) {
+                targetMouseX = x;
+                targetMouseY = y;
+
+                if (!hasUsedSteering) {
+                    hasUsedSteering = true;
+                    hideTooltip('crosshair-tooltip');
+                }
+            }
+        }
+
+        // Mouse/touch controls
+        canvas.addEventListener('mousedown', (e) => {
+            isMousePressed = true;
+            handleMove(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isMousePressed) {
+                handleMove(e.clientX, e.clientY);
+            }
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            if (isMousePressed) {
+                isMousePressed = false;
+                targetMouseX = canvas.width / 2;
+                targetMouseY = canvas.height / 2;
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches && e.touches.length > 0) {
+                isMousePressed = true;
+                handleMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+            e.preventDefault();
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (isMousePressed && e.touches && e.touches.length > 0) {
+                handleMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        });
+
+        document.addEventListener('touchend', (e) => {
+            if (isMousePressed) {
+                isMousePressed = false;
+                targetMouseX = canvas.width / 2;
+                targetMouseY = canvas.height / 2;
+            }
+        });
+
+        // Throttle controls
+        const throttleHandle = document.getElementById('throttle-handle');
+        const throttleContainer = document.getElementById('throttle-container');
+        const throttleIndicator = document.getElementById('throttle-indicator');
+
+        function updateThrottlePosition() {
+            const maxTop = 182;
+            const minTop = 10;
+            const newTop = maxTop - (throttle * (maxTop - minTop));
+            throttleHandle.style.top = newTop + 'px';
+        }
+
+        function updateSpeedIndicator() {
+            const maxTop = 182;
+            const minTop = 10;
+            const displaySpeed = Math.min(1.0, actualSpeed);
+            const indicatorTop = maxTop - (displaySpeed * (maxTop - minTop));
+            throttleIndicator.style.top = indicatorTop + 'px';
+        }
+
+        function handleThrottleMove(clientY) {
+            const rect = throttleContainer.getBoundingClientRect();
+            const relativeY = clientY - rect.top;
+            const maxTop = 182;
+            const minTop = 10;
+
+            let newThrottle = 1 - ((relativeY - minTop) / (maxTop - minTop));
+            newThrottle = Math.max(0, Math.min(1, newThrottle));
+            throttle = newThrottle;
+
+            isWarpEngaged = false;
+            isWarpCharging = false;
+            updateWarpButton();
+
+            updateThrottlePosition();
+        }
+
+        throttleHandle.addEventListener('mousedown', (e) => {
+            isDraggingThrottle = true;
+
+            if (!hasUsedThrottle) {
+                hasUsedThrottle = true;
+                hideTooltip('throttle-tooltip');
+            }
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDraggingThrottle) {
+                handleThrottleMove(e.clientY);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDraggingThrottle = false;
+        });
+
+        throttleContainer.addEventListener('click', (e) => {
+            if (e.target === throttleContainer || e.target.classList.contains('throttle-pip') || e.target.id === 'throttle-track') {
+                if (!hasUsedThrottle) {
+                    hasUsedThrottle = true;
+                    hideTooltip('throttle-tooltip');
+                }
+
+                handleThrottleMove(e.clientY);
+            }
+        });
+
+        throttleHandle.addEventListener('touchstart', (e) => {
+            isDraggingThrottle = true;
+
+            if (!hasUsedThrottle) {
+                hasUsedThrottle = true;
+                hideTooltip('throttle-tooltip');
+            }
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (isDraggingThrottle && e.touches.length > 0) {
+                handleThrottleMove(e.touches[0].clientY);
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            isDraggingThrottle = false;
+        });
+
+        // Warp button
+        const warpButton = document.getElementById('warp-button');
+
+        function updateWarpButton() {
+            if (isWarpEngaged) {
+                warpButton.classList.add('engaged');
+                warpButton.textContent = 'WARP';
+            } else if (isWarpCharging) {
+                warpButton.classList.remove('engaged');
+                warpButton.textContent = 'CHARGING';
+            } else {
+                warpButton.classList.remove('engaged');
+                warpButton.textContent = 'WARP';
+            }
+        }
+
+        warpButton.addEventListener('click', () => {
+            if (isWarpEngaged) {
+                isWarpEngaged = false;
+                isWarpCharging = false;
+            } else if (!isWarpCharging) {
+                isWarpCharging = true;
+                throttle = 1.0;
+                updateThrottlePosition();
+
+                if (!hasUsedThrottle) {
+                    hasUsedThrottle = true;
+                    hideTooltip('throttle-tooltip');
+                }
+            }
+
+            updateWarpButton();
+        });
+
+        // Initialize positions
+        updateCrosshair(canvas.width / 2, canvas.height / 2);
+        updateSpeedIndicator();
+        updateWarpButton();
+
+        // Game loop
+        function animate() {
+            try {
+                if (isWarpEngaged) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                } else {
+                    ctx.fillStyle = '#000000';
+                }
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                mouseX += (targetMouseX - mouseX) * 0.15;
+                mouseY += (targetMouseY - mouseY) * 0.15;
+                updateCrosshair(mouseX, mouseY);
+
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const steerX = (mouseX - centerX) / centerX * 0.3;
+                const steerY = (mouseY - centerY) / centerY * 0.3;
+
+                velocityX += steerX * 0.05;
+                velocityY += steerY * 0.05;
+
+                const targetRoll = steerX * 0.5;
+                rotationZ += (targetRoll - rotationZ) * 0.1;
+
+                velocityX *= 0.98;
+                velocityY *= 0.98;
+
+                playerX += velocityX;
+                playerY += velocityY;
+
+                let targetSpeed;
+                if (isWarpCharging) {
+                    targetSpeed = 1.0;
+                } else if (isWarpEngaged) {
+                    targetSpeed = 3.0;
+                } else {
+                    targetSpeed = throttle;
+                }
+
+                const acceleration = targetSpeed > actualSpeed ? 0.02 : 0.04;
+                actualSpeed += (targetSpeed - actualSpeed) * acceleration;
+
+                if (isWarpCharging && actualSpeed >= 0.98) {
+                    isWarpCharging = false;
+                    isWarpEngaged = true;
+                    updateWarpButton();
+                }
+
+                updateSpeedIndicator();
+
+                for (let i = 0; i < stars.length; i++) {
+                    stars[i].update();
+                    stars[i].draw();
+                }
+
+            } catch (error) {
+                console.error('Animation error:', error);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
